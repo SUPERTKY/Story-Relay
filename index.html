@@ -6,7 +6,7 @@
   <title>Story Relay タイトル</title>
   <style>
     :root {
-      --bg-url: url('assets/taitoru.png'); /* 背景画像ファイル名に合わせて変更 */
+      --bg-url: url('assets/background.jpg'); /* 背景画像ファイル名に合わせて変更 */
     }
 
     * { box-sizing: border-box; }
@@ -20,6 +20,12 @@
       flex-direction: column;
       overflow: hidden;
       cursor: pointer; /* タップ可能であることを示す */
+      opacity: 0;
+      transition: opacity 2s ease-in; /* フェードイン */
+    }
+
+    body.fade-in {
+      opacity: 1;
     }
 
     .sound-gate {
@@ -67,6 +73,14 @@
       const audio = document.getElementById('bgm');
       const gate = document.getElementById('soundGate');
       const btn  = document.getElementById('enableSound');
+      const body = document.body;
+
+      // フェードイン開始
+      window.addEventListener('load', () => {
+        requestAnimationFrame(() => {
+          body.classList.add('fade-in');
+        });
+      });
 
       const tryPlay = () => audio.play().catch(() => {
         gate.style.display = 'flex';
@@ -97,9 +111,16 @@
         }
       });
 
-      // 画面全体をタップしたら次のページへ遷移
-      document.body.addEventListener('click', () => {
-        window.location.href = 'next.html'; // 次のHTMLのファイル名に変更してください
+      // フェードイン完了を待ってから遷移可能にする
+      let fadeDone = false;
+      body.addEventListener('transitionend', () => {
+        fadeDone = true;
+      });
+
+      body.addEventListener('click', () => {
+        if (fadeDone) {
+          window.location.href = 'next.html'; // 次のHTMLのファイル名に変更してください
+        }
       });
     })();
   </script>
