@@ -19,9 +19,9 @@
       align-items: center;
       flex-direction: column;
       overflow: hidden;
+      cursor: pointer; /* タップ可能であることを示す */
     }
 
-    /* 自動再生がブロックされた時だけ出すオーバーレイ */
     .sound-gate {
       position: fixed; inset: 0;
       display: none;
@@ -52,10 +52,8 @@
   </style>
 </head>
 <body>
-  <!-- 自動再生を試みる。iOS対応のため playsinline を付与 -->
   <audio id="bgm" src="assets/taitoru.mp3" preload="auto" autoplay loop playsinline></audio>
 
-  <!-- 自動再生がブロックされた場合のフォールバックUI -->
   <div class="sound-gate" id="soundGate" aria-hidden="true">
     <div class="gate-card">
       <p class="gate-title">サウンドをオンにしますか？</p>
@@ -97,6 +95,11 @@
             console.warn('Audio play failed:', err);
           }
         }
+      });
+
+      // 画面全体をタップしたら次のページへ遷移
+      document.body.addEventListener('click', () => {
+        window.location.href = 'next.html'; // 次のHTMLのファイル名に変更してください
       });
     })();
   </script>
