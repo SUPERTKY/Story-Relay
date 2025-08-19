@@ -101,11 +101,35 @@ body{
 @keyframes fadeOut{ from{opacity:1} to{opacity:0} }
 
 /* 終了演出：黒画面＆読み上げ */
-#theEnd{ position:fixed; inset:0; background:#000; color:#fff; display:none; z-index:60; }
-#theEnd.show{ display:block; animation: fadeIn .8s ease both }
-#theEndInner{ max-width: min(90vw, 1100px); margin: 8vh auto; padding: 16px; }
-#finLead{ font-size: clamp(20px, 3vw, 44px); opacity:.9; margin-bottom: 16px }
-#finText{ font-size: clamp(20px, 2.2vw, 36px); line-height:1.6; white-space:pre-wrap }
+/* 置き換え（or 追記） */
+#theEnd{
+  position:fixed; inset:0; background:#000; color:#fff; display:none; z-index:60;
+}
+#theEnd.show{
+  display:flex;                     /* 画面中央に配置 */
+  align-items:center;
+  justify-content:center;
+  animation: fadeIn .8s ease both;
+}
+#theEndInner{
+  max-width: min(90vw, 1100px);
+  margin: 0 auto;                   /* 中央寄せ */
+  padding: 16px;
+  text-align: center;               /* 文言を中央揃え */
+}
+#finLead{
+  font-size: clamp(28px, 6vw, 96px);/* さらに大きく */
+  font-weight: 900;
+  letter-spacing: .02em;
+  opacity:.95;
+  margin-bottom: 18px;
+}
+#finText{
+  font-size: clamp(20px, 2.4vw, 40px);
+  line-height:1.6;
+  white-space:pre-wrap;
+}
+
 
 /* 下部テロップ（現在◯人目） */
 #ticker{
@@ -502,62 +526,66 @@ async function endSequence(){
   theEnd.classList.add('show');
   await wait(700);
 
-  const lead = document.getElementById('finLead');
-  const textEl = document.getElementById('finText');
+  const lead  = document.getElementById('finLead');
+  const textEl= document.getElementById('finText');
   const finalText = storyConcat || '(本文なし)';
 
-  // 2) 見出しだけ表示
+  // 2) 見出しだけ表示（★読まない）
   textEl.textContent = '';      // 本文はまだ出さない
   lead.style.display = 'block';
 
-  // 明瞭＆速めの読み上げ（分割読み）
-  const speak = (text)=> new Promise(resolve=>{
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP';
-    u.rate = 1.18;          // 速め
-    u.pitch = 1.0;          // くっきり
-    u.volume = 1.0;
-    const pick = speechSynthesis.getVoices().find(v=> v.lang && v.lang.startsWith('ja'));
-    if(pick) u.voice = pick;
-    u.onend = ()=> resolve();
-    if(speechSynthesis.getVoices().length===0){
-      speechSynthesis.onvoiceschanged = ()=> speechSynthesis.speak(u);
-    }else{
-      speechSynthesis.speak(u);
-    }
-  });
+  // ★ 見出しは発声しない。少し見せてから本文へ
+  await wait(1000);             // 1秒表示
 
-  // 3) 「完成した作品は……」を読み上げ
-  try{ await speak('完成した作品は……'); }catch(_){}
-
-  // 4) 見出しを消す → 本文を表示
+  // 3) 見出しを消す → 本文を表示
   lead.style.display = 'none';
   textEl.textContent = finalText;
 
-  // 5) 句読点ポーズ＋分割で読み上げ
-  const normalized = finalText
-    .replace(/、/g, '、 ')
-    .replace(/。/g, '。 ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // 4) 本文のみ読み上げ（従来どおり、聞きやすい分割）
+  try{
+    const speak = (text)=> new Promise(resolve=>{
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP';
+      u.rate = 1.18;            // 少し速め
+      u.pitch = 1.0;            // くっきり
+      u.volume = 1.0;
+      const pick = speechSynthesis.getVoices().find(v=> v.lang && v.lang.startsWith('ja'));
+      if(pick) u.voice = pick;
+      u.onend = ()=> resolve();
+      if(speechSynthesis.getVoices().length===0){
+        speechSynthesis.onvoiceschanged = ()=> speechSynthesis.speak(u);
+      }else{
+        speechSynthesis.speak(u);
+      }
+    });
 
-  const chunks = [];
-  const maxLen = 80;
-  let rest = normalized;
-  while(rest.length){
-    if(rest.length <= maxLen){ chunks.push(rest); break; }
-    const tmp = rest.slice(0, maxLen);
-    const idx = Math.max(tmp.lastIndexOf('。'), tmp.lastIndexOf('、'), tmp.lastIndexOf('！'), tmp.lastIndexOf('？'), tmp.lastIndexOf(' '));
-    const cut = (idx > 20 ? idx+1 : maxLen);
-    chunks.push(rest.slice(0, cut));
-    rest = rest.slice(cut);
-  }
+    const normalized = finalText
+      .replace(/、/g, '、 ')
+      .replace(/。/g, '。 ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-  for(const c of chunks){
-    try{ await speak(c); }catch(_){}
-    await wait(80);
+    const chunks = [];
+    const maxLen = 80;
+    let rest = normalized;
+    while(rest.length){
+      if(rest.length <= maxLen){ chunks.push(rest); break; }
+      const tmp = rest.slice(0, maxLen);
+      const idx = Math.max(tmp.lastIndexOf('。'), tmp.lastIndexOf('、'), tmp.lastIndexOf('！'), tmp.lastIndexOf('？'), tmp.lastIndexOf(' '));
+      const cut = (idx > 20 ? idx+1 : maxLen);
+      chunks.push(rest.slice(0, cut));
+      rest = rest.slice(cut);
+    }
+
+    for(const c of chunks){
+      await speak(c);
+      await wait(80);
+    }
+  }catch(_){
+    // 読み上げ不可でも表示はそのまま
   }
 }
+
 
 /** ===== ユーティリティ ===== */
 function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
@@ -573,6 +601,7 @@ function updateNoSession(){
   </script>
 </body>
 </html>
+
 
 
 
