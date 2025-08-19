@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Next Page</title>
+  <style>
+    :root { --bg-url: url('assets/background-next.jpg'); }
+
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg-url) center/cover no-repeat;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: sans-serif;
+      color: #fff;
+    }
+
+    /* 黒ベール */
+    .veil {
+      position: fixed; inset: 0;
+      background: #000;
+      opacity: 1;                 /* 初期は真っ黒 */
+      transition: opacity 800ms ease; /* フェードアウト時間 */
+      z-index: 10;
+      pointer-events: none;
+    }
+    .veil.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+  <h1>ネクストページ</h1>
+  <p>ここからコンテンツが始まります。</p>
+
+  <!-- 黒ベール -->
+  <div class="veil" id="veil"></div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const veil = document.getElementById('veil');
+      // 次のフレームで黒を透明に → フェードアウト開始
+      requestAnimationFrame(() => {
+        veil.classList.add('hidden');
+      });
+      // 完全に透明になったら削除しておくと軽い
+      veil.addEventListener('transitionend', () => {
+        veil.remove();
+      });
+    });
+  </script>
+</body>
+</html>
