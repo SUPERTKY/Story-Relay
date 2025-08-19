@@ -484,18 +484,25 @@ elSupportPanel.classList.remove('hidden');
     }
 
     // ===== 出席番号 → 入力画面へ =====
-    elSeatOk.addEventListener('click', ()=>{
-      const v = (elSeatNo.value||'').trim();
-      if(!v){ alert('出席番号を入力してください'); elSeatNo.focus(); return; }
-      currentSeat = v;
-      // 入力開始へ
-      hide(elSeat);
-      elStory.value = '';
-      updateRemain();
-      show(elInput);
-      startTimer();
-      elStory.focus();
-    });
+<!-- teacher.html の該当JS内：elSeatOk.addEventListener('click', ... ) の末尾付近に追加 -->
+elSeatOk.addEventListener('click', ()=>{
+  const v = (elSeatNo.value||'').trim();
+  if(!v){ alert('出席番号を入力してください'); elSeatNo.focus(); return; }
+  currentSeat = v;
+
+  // ★★★ ここを追加：このターンの公式な開始時刻（サーバー時刻）
+  db.ref(`${basePath}/_meta`).update({
+    ターン開始時刻: firebase.database.ServerValue.TIMESTAMP
+  }).catch(console.warn);
+
+  // 入力開始へ
+  hide(elSeat);
+  elStory.value = '';
+  updateRemain();
+  show(elInput);
+  startTimer();
+  elStory.focus();
+});
 
     // ===== 入力文字数 残数表示 =====
     function updateRemain(){
@@ -759,6 +766,7 @@ list.push({
   </script>
 </body>
 </html>
+
 
 
 
