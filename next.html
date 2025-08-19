@@ -5,48 +5,203 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Next Page</title>
   <style>
-    :root { --bg-url: url('assets/background-next.jpg'); }
+    :root {
+      --bg-url: url('assets/background-next.jpg');
+      --btn-bg: #111827;
+      --btn-fg: #ffffff;
+      --btn-bg-hover: #1f2937;
+      --accent: #60a5fa;
+      --danger: #ef4444;
+    }
 
     html, body { height: 100%; margin: 0; }
     body {
       background: var(--bg-url) center/cover no-repeat;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-family: sans-serif;
+      display: grid; place-items: center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans JP";
       color: #fff;
+      overflow: hidden;
     }
 
-    /* 黒ベール */
-    .veil {
-      position: fixed; inset: 0;
-      background: #000;
-      opacity: 1;                 /* 初期は真っ黒 */
-      transition: opacity 800ms ease; /* フェードアウト時間 */
-      z-index: 10;
-      pointer-events: none;
+    .wrap { text-align: center; }
+    .title { font-size: clamp(1.4rem, 2.2vw, 2rem); opacity: .9; margin-bottom: 18px; }
+
+    .buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      appearance: none; border: none; cursor: pointer;
+      background: var(--btn-bg); color: var(--btn-fg);
+      padding: 14px 22px; border-radius: 999px; font-weight: 700; letter-spacing: .02em;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+      transition: transform .08s ease, background .15s ease, opacity .2s ease;
     }
-    .veil.hidden { opacity: 0; }
+    .btn:hover { background: var(--btn-bg-hover); }
+    .btn:active { transform: translateY(1px) scale(.99); }
+    .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+    /* 入場時 黒→透明 フェード */
+    .veil-enter { position: fixed; inset: 0; background: #000; opacity: 1; z-index: 10; pointer-events: none;
+      transition: opacity 800ms ease; }
+    .veil-enter.hidden { opacity: 0; }
+
+    /* 先生パスワードのモーダル */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); display: none; z-index: 20; }
+    .modal { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      background: rgba(20,20,20,.9); color: #fff; width: min(92%, 420px); border-radius: 16px; padding: 22px; box-shadow: 0 10px 36px rgba(0,0,0,.6); }
+    .modal h2 { margin: 0 0 6px; font-size: 1.1rem; }
+    .modal p  { margin: 0 0 14px; opacity: .9; font-size: .95rem; }
+    .field { display: grid; gap: 8px; margin-bottom: 14px; text-align: left; }
+    .input {
+      width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.15);
+      background: rgba(0,0,0,.25); color: #fff; outline: none; font-size: 1rem;
+    }
+    .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(96,165,250,.25); }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+    .btn-accent { background: var(--accent); color: #0b1220; }
+    .btn-danger { background: var(--danger); }
+
+    .msg { min-height: 1.2em; font-size: .9rem; color: #ffd166; }
+    .msg.error { color: #ff9c9c; }
   </style>
 </head>
 <body>
-  <h1>ネクストページ</h1>
-  <p>ここからコンテンツが始まります。</p>
+  <div class="wrap" aria-live="polite">
+    <div class="title">役割を選んでください</div>
+    <div class="buttons">
+      <button class="btn" id="teacherBtn">先生</button>
+      <button class="btn" id="studentBtn">生徒</button>
+    </div>
+  </div>
 
-  <!-- 黒ベール -->
-  <div class="veil" id="veil"></div>
+  <!-- 入場フェード用 黒ベール -->
+  <div class="veil-enter" id="veilEnter"></div>
 
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const veil = document.getElementById('veil');
-      // 次のフレームで黒を透明に → フェードアウト開始
-      requestAnimationFrame(() => {
-        veil.classList.add('hidden');
-      });
-      // 完全に透明になったら削除しておくと軽い
-      veil.addEventListener('transitionend', () => {
-        veil.remove();
-      });
+  <!-- 先生ログイン用モーダル（先生メールは固定、UIはパスワードのみ） -->
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mdTitle">
+      <h2 id="mdTitle">先生ログイン</h2>
+      <p>先生用パスワードを入力してください。</p>
+      <div class="field">
+        <label for="pw">パスワード</label>
+        <input class="input" id="pw" type="password" inputmode="text" autocomplete="current-password" />
+      </div>
+      <div class="msg" id="msg"></div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="cancelBtn">キャンセル</button>
+        <button class="btn btn-accent" id="okBtn">ログイン</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase Auth でログイン必須を満たす（DBはロックのままでOK） -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+    // ★ Firebase 設定を書き換えてください
+
+    const firebaseConfig = {
+  apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
+  authDomain: "story-relay-ec15b.firebaseapp.com",
+  projectId: "story-relay-ec15b",
+  storageBucket: "story-relay-ec15b.firebasestorage.app",
+  messagingSenderId: "423778345800",
+  appId: "1:423778345800:web:d72d3569869bc3a789c97d"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // 固定の先生メール（コードに置いてOK。秘密はパスワードのみ）
+    const TEACHER_EMAIL = 'teacher@example.com'; // ←運用用に変更
+
+    // UI 要素
+    const veilEnter   = document.getElementById('veilEnter');
+    const teacherBtn  = document.getElementById('teacherBtn');
+    const studentBtn  = document.getElementById('studentBtn');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const cancelBtn   = document.getElementById('cancelBtn');
+    const okBtn       = document.getElementById('okBtn');
+    const pwInput     = document.getElementById('pw');
+    const msg         = document.getElementById('msg');
+
+    // 1) 入場時フェードアウト
+    const startEnterFade = () => {
+      requestAnimationFrame(() => veilEnter.classList.add('hidden'));
+      veilEnter.addEventListener('transitionend', () => veilEnter.remove(), { once: true });
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startEnterFade, { once: true });
+    } else { startEnterFade(); }
+
+    // 2) 先生モーダル（開いている間は生徒ボタンを無効化）
+    function openModal(){
+      modalBackdrop.style.display = 'block';
+      modalBackdrop.setAttribute('aria-hidden', 'false');
+      studentBtn.disabled = true;
+      msg.textContent = '';
+      msg.className = 'msg';
+      pwInput.value = '';
+      setTimeout(() => pwInput.focus(), 0);
+    }
+    function closeModal(){
+      modalBackdrop.style.display = 'none';
+      modalBackdrop.setAttribute('aria-hidden', 'true');
+      studentBtn.disabled = false;
+    }
+    teacherBtn.addEventListener('click', openModal);
+    cancelBtn.addEventListener('click', closeModal);
+
+    // 3) 先生ログイン（Firebase Auth: 固定メール + 入力パスワード）
+    async function teacherLogin(){
+      msg.textContent = 'ログイン中...';
+      okBtn.disabled = true; cancelBtn.disabled = true; teacherBtn.disabled = true;
+      try {
+        const password = pwInput.value ?? '';
+        await signInWithEmailAndPassword(auth, TEACHER_EMAIL, password);
+        msg.textContent = '成功！先生ページへ移動します...';
+        setTimeout(() => { window.location.href = 'teacher.html'; }, 300);
+      } catch (e) {
+        console.error(e);
+        msg.textContent = 'パスワードが違うか、ログインできません。';
+        msg.className = 'msg error';
+      } finally {
+        okBtn.disabled = false; cancelBtn.disabled = false; teacherBtn.disabled = false;
+      }
+    }
+    okBtn.addEventListener('click', teacherLogin);
+    pwInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') teacherLogin();
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // 4) 生徒は匿名ログイン（「ログインが必要」を満たしつつ権限は最低限）
+    async function studentEnter(){
+      studentBtn.disabled = true;
+      try {
+        // 既にログイン済みならそのまま
+        const user = auth.currentUser;
+        if (!user) await signInAnonymously(auth);
+        window.location.href = 'student.html';
+      } catch (e) {
+        console.error(e);
+        alert('ログインに失敗しました。通信状況を確認してください。');
+      } finally {
+        studentBtn.disabled = false;
+      }
+    }
+    studentBtn.addEventListener('click', studentEnter);
+
+    // （任意）すでに先生でログイン済みなら自動で teacher.html へ
+    onAuthStateChanged(auth, (user) => {
+      if (!user) return;
+      // 先生アカウントは匿名ではない（emailVerified でなくてもOK）
+      if (user.isAnonymous) return; // 生徒はスルー
+      // 先生として残っていたら teacher.html へ
+      // ※必要ならここでクレーム検査 or メール一致検査
+      if (user.email === TEACHER_EMAIL) {
+        window.location.href = 'teacher.html';
+      }
     });
   </script>
 </body>
