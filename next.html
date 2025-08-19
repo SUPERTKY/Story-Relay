@@ -70,6 +70,7 @@
     <div class="buttons">
       <button class="btn" id="teacherBtn">先生</button>
       <button class="btn" id="studentBtn">生徒</button>
+      <button class="btn" id="monitorBtn">モニター</button>
     </div>
     <div id="status" style="margin-top:12px; min-height:1.2em; opacity:.9;"></div>
   </div>
@@ -80,8 +81,9 @@
   <!-- 先生ログイン用モーダル（先生メールは固定、UIはパスワードのみ） -->
   <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mdTitle">
-      <h2 id="mdTitle">先生ログイン</h2>
-      <p>先生用パスワードを入力してください。</p>
+<h2 id="mdTitle">ログイン</h2>
+<p id="mdDesc">パスワードを入力してください。</p>
+
 <div class="field">
   <label for="pw">パスワード</label>
   <input class="input" id="pw" type="text" autocomplete="off" />
@@ -94,12 +96,7 @@
       </div>
     </div>
   </div>
-  <div class="buttons">
-  <button class="btn" id="teacherBtn">先生</button>
-  <button class="btn" id="studentBtn">生徒</button>
-  <!-- 追加 ↓↓↓ -->
-  <button class="btn" id="monitorBtn">役割モニター</button>
-</div>
+
 
 
   <!-- Firebase Auth でログイン必須を満たす（DBはロックのままでOK） -->
@@ -120,7 +117,9 @@ const firebaseConfig = {
     const auth = getAuth(app);
 
     // 固定の先生メール（コードに置いてOK。秘密はパスワードのみ）
-    const TEACHER_EMAIL = 'teacher@example.com'; // ←運用用に変更
+    const TEACHER_EMAIL = 'teacher@example.com';   // ←運用用に変更
+const MONITOR_EMAIL = 'monitor@example.com';   // ←運用用に追加（Firebase Auth にユーザーを作成しておく）
+
 
     // UI 要素
     const veilEnter   = document.getElementById('veilEnter');
@@ -132,6 +131,12 @@ const firebaseConfig = {
     const pwInput     = document.getElementById('pw');
     const msg         = document.getElementById('msg');
     const statusEl    = document.getElementById('status');
+    const monitorBtn    = document.getElementById('monitorBtn');   // 追加
+const mdTitle       = document.getElementById('mdTitle');      // 追加
+const mdDesc        = document.getElementById('mdDesc');       // 追加
+
+let selectedRole = null; // 'teacher' | 'monitor' を保持
+
 
     // 1) 入場時フェードアウト
     const startEnterFade = () => {
@@ -143,40 +148,66 @@ const firebaseConfig = {
     } else { startEnterFade(); }
 
     // 2) 先生モーダル（開いている間は生徒ボタンを無効化）
-    function openModal(){
-      modalBackdrop.style.display = 'block';
-      modalBackdrop.setAttribute('aria-hidden', 'false');
-      studentBtn.disabled = true;
-      msg.textContent = '';
-      msg.className = 'msg';
-      pwInput.value = '';
-      setTimeout(() => pwInput.focus(), 0);
-    }
+function openModal(role){
+  selectedRole = role; // 'teacher' or 'monitor'
+  // 役割に応じてタイトル・説明を出し分け
+  if (role === 'teacher') {
+    mdTitle.textContent = '先生ログイン';
+    mdDesc.textContent  = '先生用パスワードを入力してください。';
+  } else {
+    mdTitle.textContent = '役割モニターログイン';
+    mdDesc.textContent  = 'モニター用パスワードを入力してください。';
+  }
+  modalBackdrop.style.display = 'block';
+  modalBackdrop.setAttribute('aria-hidden', 'false');
+  studentBtn.disabled = true;
+  msg.textContent = '';
+  msg.className = 'msg';
+  pwInput.value = '';
+  setTimeout(() => pwInput.focus(), 0);
+}
+function closeModal(){
+  modalBackdrop.style.display = 'none';
+  modalBackdrop.setAttribute('aria-hidden', 'true');
+  studentBtn.disabled = false;
+  selectedRole = null;
+}
+
     function closeModal(){
       modalBackdrop.style.display = 'none';
       modalBackdrop.setAttribute('aria-hidden', 'true');
       studentBtn.disabled = false;
     }
-    teacherBtn.addEventListener('click', openModal);
-    cancelBtn.addEventListener('click', closeModal);
+teacherBtn.addEventListener('click', () => openModal('teacher'));
+monitorBtn.addEventListener('click', () => openModal('monitor')); // 追加
+cancelBtn.addEventListener('click', closeModal);
+
 
     // 3) 先生ログイン（Firebase Auth: 固定メール + 入力パスワード）
-    async function teacherLogin(){
-      msg.textContent = 'ログイン中...';
-      okBtn.disabled = true; cancelBtn.disabled = true; teacherBtn.disabled = true;
-      try {
-        const password = pwInput.value ?? '';
-        await signInWithEmailAndPassword(auth, TEACHER_EMAIL, password);
-        msg.textContent = '成功！先生ページへ移動します...';
-        setTimeout(() => { window.location.href = 'teacher.html'; }, 300);
-      } catch (e) {
-        console.error(e);
-        msg.textContent = 'パスワードが違うか、ログインできません。';
-        msg.className = 'msg error';
-      } finally {
-        okBtn.disabled = false; cancelBtn.disabled = false; teacherBtn.disabled = false;
-      }
-    }
+async function roleLogin(){
+  msg.textContent = 'ログイン中...';
+  okBtn.disabled = true; cancelBtn.disabled = true; teacherBtn.disabled = true; monitorBtn.disabled = true;
+  try {
+    const password = pwInput.value ?? '';
+    const email = (selectedRole === 'monitor') ? MONITOR_EMAIL : TEACHER_EMAIL;
+    await signInWithEmailAndPassword(auth, email, password);
+    msg.textContent = '成功！ページへ移動します...';
+    const dest = (selectedRole === 'monitor') ? 'monitor.html' : 'teacher.html';
+    setTimeout(() => { window.location.href = dest; }, 300);
+  } catch (e) {
+    console.error(e);
+    msg.textContent = 'パスワードが違うか、ログインできません。';
+    msg.className = 'msg error';
+  } finally {
+    okBtn.disabled = false; cancelBtn.disabled = false; teacherBtn.disabled = false; monitorBtn.disabled = false;
+  }
+}
+okBtn.addEventListener('click', roleLogin);
+pwInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') roleLogin();
+  if (e.key === 'Escape') closeModal();
+});
+
     okBtn.addEventListener('click', teacherLogin);
     pwInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') teacherLogin();
@@ -209,21 +240,26 @@ const firebaseConfig = {
     studentBtn.addEventListener('click', studentEnter);
 
     // （任意）すでに先生でログイン済みなら自動で teacher.html へ
-    onAuthStateChanged(auth, (user) => {
-      if (!user) { statusEl.textContent = ''; return; }
-      if (user.isAnonymous) {
-        statusEl.textContent = '（匿名ユーザーでサインイン中）';
-        return;
-      }
-      if (user.email === TEACHER_EMAIL) {
-        statusEl.textContent = '先生としてサインイン中。まもなく先生ページへ移動します。';
-        window.location.href = 'teacher.html';
-      } else {
-        statusEl.textContent = `別アカウントでサインイン中（${user.email||'emailなし'}）`;
-      }
-    });
+onAuthStateChanged(auth, (user) => {
+  if (!user) { statusEl.textContent = ''; return; }
+  if (user.isAnonymous) {
+    statusEl.textContent = '（匿名ユーザーでサインイン中）';
+    return;
+  }
+  if (user.email === TEACHER_EMAIL) {
+    statusEl.textContent = '先生としてサインイン中。まもなく先生ページへ移動します。';
+    window.location.href = 'teacher.html';
+  } else if (user.email === MONITOR_EMAIL) {
+    statusEl.textContent = 'モニターとしてサインイン中。まもなくモニターページへ移動します。';
+    window.location.href = 'monitor.html';
+  } else {
+    statusEl.textContent = `別アカウントでサインイン中（${user.email||'emailなし'}）`;
+  }
+});
+
   </script>
 </body>
 </html>
+
 
 
