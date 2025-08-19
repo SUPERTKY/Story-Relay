@@ -94,40 +94,36 @@
 
   <audio id="bgm" src="assets/game_bgm.mp3" loop></audio>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
+  <!-- ✅ Firebaseバンドル版 (名前空間あり) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-
+    // ✅ Firebase設定
     const firebaseConfig = {
-  apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
-  authDomain: "story-relay-ec15b.firebaseapp.com",
-      databaseURL: "https://story-relay-ec15b-default-rtdb.firebaseio.com/
-",
-  projectId: "story-relay-ec15b",
-  storageBucket: "story-relay-ec15b.firebasestorage.app",
-  messagingSenderId: "423778345800",
-  appId: "1:423778345800:web:d72d3569869bc3a789c97d"
-};
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database(app);
+      apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
+      authDomain: "story-relay-ec15b.firebaseapp.com",
+      databaseURL: "https://story-relay-ec15b-default-rtdb.firebaseio.com/",
+      projectId: "story-relay-ec15b",
+      storageBucket: "story-relay-ec15b.appspot.com",
+      messagingSenderId: "423778345800",
+      appId: "1:423778345800:web:d72d3569869bc3a789c97d"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
+    // DOM取得
     const startBtn = document.getElementById("startBtn");
     const countdown = document.getElementById("countdown");
     const bgm = document.getElementById("bgm");
-
     const inputArea = document.getElementById("inputArea");
     const storyInput = document.getElementById("storyInput");
     const charCount = document.getElementById("charCount");
     const decideBtn = document.getElementById("decideBtn");
-
     const switchArea = document.getElementById("switchArea");
     const switchBtn = document.getElementById("switchBtn");
-
     const goArea = document.getElementById("goArea");
     const goBtn = document.getElementById("goBtn");
-
     const timerBar = document.getElementById("timerBar");
     const timerProgress = document.getElementById("timerProgress");
 
@@ -192,8 +188,7 @@
       const text = storyInput.value.trim();
       if (text.length > 0) {
         // Firebaseに追加保存
-        const ref = db.ref("story");
-        ref.push(text);
+        db.ref("story").push(text);
       }
 
       inputArea.style.display = "none";
