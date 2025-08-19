@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>生徒ページ</title>
+  <title>ストーリーリレー（生徒）</title>
   <style>
-:root{
-  --bg:#0b1022; --fg:#e5e7eb; --muted:#94a3b8;
-  --accent:#60a5fa; --ok:#34d399; --danger:#ef4444;
-}
+:root{ --bg:#0b1022; --fg:#e5e7eb; --muted:#94a3b8; --accent:#60a5fa; --ok:#34d399; --danger:#ef4444; }
 html,body{height:100%;margin:0}
 body{
   background:
@@ -21,10 +18,7 @@ body{
   text-align:center;overflow:hidden;padding:16px;
   animation:bgFloat 16s ease-in-out infinite alternate;
 }
-@keyframes bgFloat{
-  0%{background-position:0 0,0 0,0 0; filter:hue-rotate(0deg)}
-  100%{background-position:10px -14px,-12px 18px,0 0; filter:hue-rotate(10deg)}
-}
+@keyframes bgFloat{ 0%{background-position:0 0,0 0,0 0; filter:hue-rotate(0deg)} 100%{background-position:10px -14px,-12px 18px,0 0; filter:hue-rotate(10deg)}}
 h1{margin:0 0 4px;font-size:1.4rem;color:var(--muted);font-weight:600}
 
 .card{
@@ -37,23 +31,19 @@ h1{margin:0 0 4px;font-size:1.4rem;color:var(--muted);font-weight:600}
   padding:16px;
   display:flex;flex-direction:column;gap:12px;align-items:stretch;
 }
-
 .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-input,textarea,button{font:inherit;border:none;border-radius:12px;outline:none}
-input,textarea{
+input,button{font:inherit;border:none;border-radius:12px;outline:none}
+input{
   background:rgba(12,16,30,.9);color:var(--fg);padding:12px 14px;min-width:240px;
   border:1px solid rgba(255,255,255,.12);
 }
-input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(96,165,250,.2)}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(96,165,250,.2)}
 .btn{padding:12px 20px;font-weight:700;cursor:pointer;background:linear-gradient(180deg,#75b6ff,#3b82f6);color:#0b1220}
 .btn:disabled{opacity:.6;cursor:not-allowed}
 .badge{display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.35);color:#bfdbfe;font-weight:700}
 
 .stat{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
-.kv{
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
-  border-radius:12px;padding:8px 12px;min-width:150px
-}
+.kv{ background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1); border-radius:12px;padding:8px 12px;min-width:150px }
 .kv small{display:block;color:var(--muted);font-size:.8rem}
 .kv strong{font-size:1.1rem}
 
@@ -61,10 +51,7 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(
 .count{font-size:.85rem;color:var(--muted)}
 .success{color:var(--ok)}
 .error{color:#fecaca}
-
 .footer{opacity:.7;font-size:.8rem;margin-top:8px}
-
-.hidden{display:none}
   </style>
 </head>
 <body>
@@ -97,13 +84,13 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(
     <div>
       <div class="row" style="justify-content:center">
         <input id="supportText" type="text" maxlength="20" placeholder="先生・発表者へのサポート文（最大20文字）" />
-        <button id="btnSend" class="btn">送信</button>
+        <button id="btnSend" class="btn" disabled>送信</button>
       </div>
       <div class="count"><span id="remain">残り 20 文字</span>／不適切な内容は送らないでください</div>
       <div id="sendResult" class="note"></div>
     </div>
 
-    <div class="footer">このページは開催中のみ送信できます。自動で最新セッションに接続します。</div>
+    <div class="footer">開催が始まると自動接続し、終了すると自動で送信停止します。</div>
   </div>
 
   <!-- Firebase v8（互換） -->
@@ -139,10 +126,11 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(
 
     // ===== 状態 =====
     const today = new Date().toISOString().split('T')[0];
-    let basePath = '';          // まとめくくり/<date>/<N>人まとめ（最新）
-    let meta = { 参加人数: 0 };
+    let basePath = '';        // まとめくくり/<date>/<N>人まとめ（常に最新に追従）
+    let meta = { 参加人数: 0, 状態: 'live' };
+    let progressOff = null;   // 進行ウォッチ解除関数
 
-    // 追記: 入力カウント
+    // 入力カウント
     elInput.addEventListener('input', ()=>{
       const left = 20 - (elInput.value||'').length;
       elRemain.textContent = `残り ${left} 文字`;
@@ -151,29 +139,25 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(
     // 送信
     elBtnSend.addEventListener('click', async ()=>{
       const text = (elInput.value||'').trim();
-      if(!basePath){
-        toast('今日はまだ開催がありません'); return;
-      }
+      if(!basePath){ toast('開催中ではありません'); return; }
       if(!text){ toast('メッセージを入力してください'); return; }
+      if(isEnded()){ toast('このセッションは終了しました'); return; }
       try{
         elBtnSend.disabled = true;
-        await db.ref(`${basePath}/support`).push({
-          文: text,
-          タイムスタンプ: Date.now()
-        });
+        await db.ref(`${basePath}/support`).push({ 文: text, タイムスタンプ: Date.now() });
         elInput.value=''; elInput.dispatchEvent(new Event('input'));
         showResult('送信しました', true);
       }catch(e){
         showResult('送信に失敗しました: ' + (e.code||e.message), false);
       }finally{
-        elBtnSend.disabled = false;
+        elBtnSend.disabled = isEnded() || !basePath;
       }
     });
 
     function showResult(msg, ok){
       elResult.textContent = msg;
       elResult.className = 'note ' + (ok ? 'success' : 'error');
-      setTimeout(()=>{ elResult.textContent=''; elResult.className='note'; }, 2000);
+      setTimeout(()=>{ elResult.textContent=''; elResult.className='note'; }, 1800);
     }
     function toast(msg){
       const t = document.createElement('div');
@@ -191,67 +175,124 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(
       try{
         if(!auth.currentUser){ await auth.signInAnonymously(); }
         elStatus.textContent = '匿名ログイン済み';
-        attachToLatestSessionForToday();
+        attachDateWatcher();
       }catch(e){
         elStatus.textContent = 'ログイン失敗: ' + (e.code||e.message);
       }
     }
 
-    // ===== 今日の最新セッションを検出 =====
-    async function attachToLatestSessionForToday(){
+    // ===== 今日のまとめ一覧にリアルタイム追従 =====
+    function attachDateWatcher(){
       const dateRef = db.ref(`まとめくくり/${today}`);
-      const snap = await dateRef.once('value');
-      const obj = snap.val() || {};
-      const keys = Object.keys(obj).filter(k=>k.endsWith('人まとめ'));
-      if(keys.length === 0){
-        // 開催なし
-        basePath = '';
+      dateRef.on('value', snap=>{
+        const obj = snap.val() || {};
+        // 「◯人まとめ」を抽出
+        const keys = Object.keys(obj).filter(k=>k.endsWith('人まとめ'));
+        if(keys.length === 0){
+          switchToBasePath('');
+          updateUIForNoSession();
+          return;
+        }
+        // _meta.開始時刻 最大のまとめを選択
+        let bestKey = ''; let bestTs = -1;
+        for(const k of keys){
+          const m = obj[k] && obj[k]._meta;
+          const ts = (m && m.開始時刻) || 0;
+          if(ts > bestTs){ bestTs = ts; bestKey = k; }
+        }
+        const nextBase = `まとめくくり/${today}/${bestKey}`;
+        switchToBasePath(nextBase);
+      });
+    }
+
+    // セッション切替（既存リスナーの解除→新規リスナー）
+    function switchToBasePath(nextPath){
+      if(basePath === nextPath) return;
+      // 旧セッション監視解除
+      if(progressOff){ progressOff(); progressOff = null; }
+      basePath = nextPath;
+
+      if(!basePath){
         elLive.textContent = '開催なし';
         elTotal.textContent = '-';
         elSaved.textContent = '-';
         elNow.textContent   = '- 人目';
-        elBtnSend.disabled = true;
-        elStatus.textContent = '今日はまだ開催がありません';
+        elBtnSend.disabled  = true;
         return;
       }
-      // 最新（_meta.開始時刻 が最大）のまとめを選ぶ
-      let bestKey = '';
-      let bestTs  = -1;
-      for(const k of keys){
-        const m = obj[k] && obj[k]._meta;
-        const ts = m && m.開始時刻 || 0;
-        if(ts > bestTs){ bestTs = ts; bestKey = k; }
-      }
-      basePath = `まとめくくり/${today}/${bestKey}`;
-      elStatus.textContent = `接続しました：${bestKey}`;
-      elBtnSend.disabled = false;
-      elLive.textContent = '開催中';
-      // メタと進行を監視
-      watchProgress();
-    }
 
-    // ===== 進行監視（記録済み人数・参加人数・推定現在） =====
-    function watchProgress(){
-      if(!basePath) return;
-
-      // メタ（参加人数）
-      db.ref(`${basePath}/_meta`).on('value', s=>{
-        meta = s.val() || { 参加人数: 0 };
+      // 新セッション監視
+      const offFns = [];
+      // _meta
+      const metaRef = db.ref(`${basePath}/_meta`);
+      const off1 = metaRef.on('value', s=>{
+        meta = s.val() || { 参加人数: 0, 状態: 'live' };
         elTotal.textContent = meta.参加人数 || 0;
+        refreshLiveStatus(); // 状態表記を即更新
       });
+      offFns.push(()=> metaRef.off('value', off1));
 
-      // 子数（_meta を除く）
-      db.ref(basePath).on('value', s=>{
+      // 進捗（数字キーのみカウント）
+      const sessRef = db.ref(basePath);
+      const off2 = sessRef.on('value', s=>{
         const v = s.val() || {};
-        const keys = Object.keys(v).filter(k=>k !== '_meta' && k !== 'support' && k !== '_supportHistory');
-        // 数字キーのみ（1,2,3...）に限定
-        const saved = keys.filter(k => /^\d+$/.test(k)).length;
+        const keys = Object.keys(v).filter(k=> /^\d+$/.test(k)); // 1,2,3...
+        const saved = keys.length;
         elSaved.textContent = saved;
 
         const total = meta.参加人数 || 0;
-        const now   = Math.min(saved + 1, Math.max(total, 1)); // 推定: 次に書く人
+        const now   = Math.min(saved + 1, Math.max(total, 1));
         elNow.textContent = `${now} 人目`;
+
+        refreshLiveStatus(saved, total);
       });
+      offFns.push(()=> sessRef.off('value', off2));
+
+      progressOff = ()=> offFns.forEach(fn=>fn());
+      // 初期表示
+      elStatus.textContent = '開催中のセッションに接続しました';
+    }
+
+    // 「開催中 / 終了 / なし」の自動判定とボタン制御
+    function refreshLiveStatus(_saved, _total){
+      const saved = typeof _saved === 'number' ? _saved : parseInt(elSaved.textContent,10) || 0;
+      const total = typeof _total === 'number' ? _total : parseInt(elTotal.textContent,10) || 0;
+
+      if(!basePath){
+        elLive.textContent = '開催なし';
+        elBtnSend.disabled = true;
+        return;
+      }
+      // 先生側が _meta.状態 を書いていればそれを優先
+      if(meta && meta.状態 === 'ended'){
+        elLive.textContent = '終了';
+        elBtnSend.disabled = true;
+        return;
+      }
+      // 件数から自動終了判定
+      if(total > 0 && saved >= total){
+        elLive.textContent = '終了';
+        elBtnSend.disabled = true;
+      }else{
+        elLive.textContent = '開催中';
+        elBtnSend.disabled = false;
+      }
+    }
+    function isEnded(){
+      if(!basePath) return true;
+      if(meta && meta.状態 === 'ended') return true;
+      const saved = parseInt(elSaved.textContent,10) || 0;
+      const total = parseInt(elTotal.textContent,10) || 0;
+      return total > 0 && saved >= total;
+    }
+
+    function updateUIForNoSession(){
+      elStatus.textContent = '今日はまだ開催がありません';
+      elLive.textContent   = '開催なし';
+      elTotal.textContent  = '-';
+      elSaved.textContent  = '-';
+      elNow.textContent    = '- 人目';
+      elBtnSend.disabled   = true;
     }
   </script>
 </body>
