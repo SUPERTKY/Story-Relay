@@ -329,6 +329,7 @@ function attachDateWatcher(){
 }
 
 function switchSession(nextPath, startTs){
+  resetUI();
   if(basePath === nextPath) return;
 
   // 旧監視解除
@@ -598,9 +599,37 @@ function updateNoSession(){
   storyConcat = ''; concatEl.textContent = '';
   stopTimer(); setRing(LIMIT);
 }
+function resetUI() {
+  // タイマー停止
+  stopTimer();
+
+  // ストーリー本文をクリア
+  storyConcat = '';
+  concatEl.textContent = '';
+
+  // オーバーレイ類を消す
+  overlay.classList.remove('show');
+  overlayBox.className = '';
+  overlayBox.innerHTML = '';
+
+  // 終了画面をリセット
+  theEnd.classList.remove('show');
+  finText.textContent = '';
+  const lead = document.getElementById('finLead');
+  if (lead) lead.style.display = 'block';
+
+  // BGMを止める
+  fadeOutBgm();
+
+  // フラグをリセット
+  endedOnce = false;
+  lastMetaState = null;
+}
+
   </script>
 </body>
 </html>
+
 
 
 
