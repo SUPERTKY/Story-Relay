@@ -2,216 +2,226 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Teacher Page</title>
+  <title>Teacher</title>
   <style>
     body {
       margin: 0;
-      height: 100vh;
-      background: #111827;
-      color: white;
+      padding: 0;
+      background: #111;
+      color: #fff;
+      font-family: Arial, sans-serif;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      font-family: sans-serif;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
     }
-    h1 { margin-bottom: 20px; }
+
     #countdown {
-      font-size: 6rem;
-      font-weight: bold;
-      animation: fadeInOut 1s linear infinite;
+      font-size: 5em;
+      opacity: 0;
+      transition: opacity 0.5s;
     }
-    @keyframes fadeInOut {
-      0% { opacity: 0; transform: scale(0.5);}
-      50% { opacity: 1; transform: scale(1.2);}
-      100% { opacity: 0; transform: scale(0.5);}
+
+    #inputArea, #turnArea {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
     }
-    textarea, input {
-      margin-top: 10px;
-      padding: 8px;
-      font-size: 1rem;
-    }
-    button {
-      margin-top: 12px;
-      padding: 12px 24px;
-      font-size: 1.2rem;
-      border: none;
+
+    input, button {
+      font-size: 1.2em;
+      padding: 8px 12px;
       border-radius: 8px;
+      border: none;
+      margin: 5px;
+    }
+
+    button {
+      background: #4caf50;
+      color: white;
       cursor: pointer;
+      transition: background 0.3s;
     }
-    #timerBar {
-      width: 80%;
-      max-width: 400px;
-      height: 20px;
-      background: #444;
-      border-radius: 10px;
-      margin-top: 15px;
-      overflow: hidden;
+
+    button:hover {
+      background: #45a049;
     }
-    #timerProgress {
-      width: 100%;
-      height: 100%;
-      background: #34d399;
-      transition: width 1s linear;
+
+    #charCount {
+      font-size: 0.9em;
+      color: #ccc;
+    }
+
+    #timer {
+      font-size: 1.5em;
+      margin-top: 10px;
+      color: #ffcc00;
     }
   </style>
 </head>
 <body>
-  <h1>ストーリーリレー（先生ページ）</h1>
+  <h1>先生画面</h1>
 
-  <!-- 参加人数入力 -->
-  <input type="number" id="totalPlayers" placeholder="参加人数を入力">
-  <button id="startBtn">スタート</button>
+  <!-- 参加人数・出席番号入力 -->
+  <div id="setupArea">
+    <input type="number" id="totalPlayers" placeholder="参加人数を入力">
+    <input type="number" id="myNumber" placeholder="自分の出席番号を入力">
+    <button id="startBtn">スタート</button>
+  </div>
 
+  <!-- カウントダウン -->
   <div id="countdown"></div>
 
-  <div id="inputArea" style="display:none; flex-direction:column; align-items:center;">
-    <p id="turnInfo"></p>
-    <input type="number" id="studentNumber" placeholder="出席番号を入力">
-    <textarea id="storyInput" maxlength="35" placeholder="ここに入力 (最大35文字)"></textarea>
-    <div id="charCount">残り 35 文字</div>
-    <button id="decideBtn">決定</button>
-    <div id="timerBar"><div id="timerProgress"></div></div>
+  <!-- 入力エリア -->
+  <div id="inputArea">
+    <textarea id="storyInput" maxlength="35" rows="3" cols="40" placeholder="ここに入力(最大35文字)"></textarea>
+    <div id="charCount">0 / 35</div>
+    <button id="submitBtn">決定</button>
+    <div id="timer">制限時間: 30</div>
   </div>
 
-  <div id="switchArea" style="display:none; flex-direction:column; align-items:center;">
-    <p>次の人に代わってね！</p>
-    <button id="switchBtn">代わった</button>
-  </div>
-
-  <div id="goArea" style="display:none; flex-direction:column; align-items:center;">
-    <p>次の人、準備OK？</p>
-    <button id="goBtn">どうぞ！</button>
+  <!-- ターン切替エリア -->
+  <div id="turnArea">
+    <h2 id="turnMessage">次の人に代わってね！</h2>
+    <button id="nextTurnBtn">どうぞ！</button>
   </div>
 
   <audio id="bgm" src="assets/game_bgm.mp3" loop></audio>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
   <script>
+    // === Firebase 設定 ===
     const firebaseConfig = {
       apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
       authDomain: "story-relay-ec15b.firebaseapp.com",
-      databaseURL: "https://story-relay-ec15b-default-rtdb.firebaseio.com/",
+      databaseURL: "https://story-relay-ec15b-default-rtdb.europe-west1.firebasedatabase.app",
       projectId: "story-relay-ec15b",
       storageBucket: "story-relay-ec15b.appspot.com",
       messagingSenderId: "423778345800",
       appId: "1:423778345800:web:d72d3569869bc3a789c97d"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // === DOM要素 ===
     const startBtn = document.getElementById("startBtn");
-    const countdown = document.getElementById("countdown");
-    const bgm = document.getElementById("bgm");
     const totalPlayersInput = document.getElementById("totalPlayers");
-
+    const myNumberInput = document.getElementById("myNumber");
+    const countdownEl = document.getElementById("countdown");
     const inputArea = document.getElementById("inputArea");
     const storyInput = document.getElementById("storyInput");
-    const studentNumber = document.getElementById("studentNumber");
     const charCount = document.getElementById("charCount");
-    const decideBtn = document.getElementById("decideBtn");
-    const turnInfo = document.getElementById("turnInfo");
+    const submitBtn = document.getElementById("submitBtn");
+    const turnArea = document.getElementById("turnArea");
+    const nextTurnBtn = document.getElementById("nextTurnBtn");
+    const timerEl = document.getElementById("timer");
+    const bgm = document.getElementById("bgm");
 
-    const switchArea = document.getElementById("switchArea");
-    const switchBtn = document.getElementById("switchBtn");
-    const goArea = document.getElementById("goArea");
-    const goBtn = document.getElementById("goBtn");
-    const timerBar = document.getElementById("timerBar");
-    const timerProgress = document.getElementById("timerProgress");
-
-    const LIMIT = 30;
-    let timerInterval;
     let totalPlayers = 0;
-    let currentTurn = 1;
-    let todayKey = new Date().toISOString().slice(0,10); // 例: "2025-08-19"
+    let currentPlayer = 1;
+    let currentStory = "";
+    let timer;
+    let timeLeft = 30;
 
-    storyInput.addEventListener("input", () => {
-      const remain = 35 - storyInput.value.length;
-      charCount.textContent = `残り ${remain} 文字`;
-    });
-
+    // === スタートボタン ===
     startBtn.addEventListener("click", async () => {
       totalPlayers = parseInt(totalPlayersInput.value);
-      if (!totalPlayers) {
-        alert("参加人数を入力してください");
+      const myNumber = myNumberInput.value.trim();
+
+      if (!totalPlayers || !myNumber) {
+        alert("参加人数と自分の番号を入力してください");
         return;
       }
-      startBtn.style.display = "none";
-      totalPlayersInput.style.display = "none";
+
+      document.getElementById("setupArea").style.display = "none";
+
       await runCountdown();
-      bgm.play();
+      try { bgm.play(); } catch(e) { console.warn("BGM再生失敗:", e); }
+
       startTurn();
     });
 
+    // === カウントダウン ===
     async function runCountdown() {
-      const seq = ["3", "2", "1", "スタート!"];
-      for (let text of seq) {
-        countdown.textContent = text;
-        countdown.style.opacity = 1;
-        countdown.style.transform = "scale(1.5)";
-        await wait(1000);
-        countdown.style.opacity = 0;
+      const numbers = ["3", "2", "1", "スタート!"];
+      for (let num of numbers) {
+        countdownEl.innerText = num;
+        countdownEl.style.opacity = 1;
+        await new Promise(r => setTimeout(r, 1000));
+        countdownEl.style.opacity = 0;
+        await new Promise(r => setTimeout(r, 300));
       }
-      countdown.textContent = "";
     }
 
+    // === ターン開始 ===
     function startTurn() {
       inputArea.style.display = "flex";
-      switchArea.style.display = "none";
-      goArea.style.display = "none";
+      turnArea.style.display = "none";
       storyInput.value = "";
-      studentNumber.value = "";
-      charCount.textContent = "残り 35 文字";
-      turnInfo.textContent = `今 ${currentTurn} 人目 / 全 ${totalPlayers} 人`;
-      startTimer();
+      updateCharCount();
+      resetTimer();
     }
 
-    function startTimer() {
-      clearInterval(timerInterval);
-      let timeLeft = LIMIT;
-      timerProgress.style.width = "100%";
-      timerInterval = setInterval(() => {
+    // === 文字数カウント ===
+    storyInput.addEventListener("input", updateCharCount);
+    function updateCharCount() {
+      charCount.textContent = storyInput.value.length + " / 35";
+    }
+
+    // === 決定ボタン ===
+    submitBtn.addEventListener("click", () => {
+      const text = storyInput.value.trim();
+      if (!text) return;
+
+      currentStory += text + " ";
+      saveToFirebase(currentStory);
+
+      inputArea.style.display = "none";
+      turnArea.style.display = "flex";
+    });
+
+    // === 次のターン ===
+    nextTurnBtn.addEventListener("click", () => {
+      currentPlayer++;
+      if (currentPlayer > totalPlayers) {
+        alert("全員終了しました！");
+        return;
+      }
+      startTurn();
+    });
+
+    // === タイマー ===
+    function resetTimer() {
+      clearInterval(timer);
+      timeLeft = 30;
+      timerEl.innerText = "制限時間: " + timeLeft;
+      timer = setInterval(() => {
         timeLeft--;
-        timerProgress.style.width = (timeLeft / LIMIT * 100) + "%";
+        timerEl.innerText = "制限時間: " + timeLeft;
         if (timeLeft <= 0) {
-          clearInterval(timerInterval);
-          decideAction();
+          clearInterval(timer);
+          submitBtn.click(); // 時間切れで自動決定
         }
       }, 1000);
     }
 
-    decideBtn.addEventListener("click", decideAction);
-
-    function decideAction() {
-      clearInterval(timerInterval);
-      const text = storyInput.value.trim();
-      const number = studentNumber.value.trim();
-      if (text && number) {
-        const ref = db.ref(`storyRelay/${todayKey}/${totalPlayers}人まとめ/${currentTurn}人目`);
-        ref.set({ number, text, time: Date.now() });
-      }
-      inputArea.style.display = "none";
-      switchArea.style.display = "flex";
+    // === Firebaseに保存 ===
+    function saveToFirebase(storyText) {
+      const today = new Date().toISOString().split("T")[0];
+      const refPath = `まとめくくり/${today}/${totalPlayers}人目くくり/${currentPlayer}`;
+      db.ref(refPath).set({
+        text: storyText,
+        player: currentPlayer,
+        timestamp: Date.now()
+      });
     }
-
-    switchBtn.addEventListener("click", () => {
-      switchArea.style.display = "none";
-      goArea.style.display = "flex";
-    });
-
-    goBtn.addEventListener("click", () => {
-      currentTurn++;
-      goArea.style.display = "none";
-      if (currentTurn <= totalPlayers) {
-        startTurn();
-      } else {
-        alert("全員終了しました！");
-      }
-    });
-
-    function wait(ms){ return new Promise(res=>setTimeout(res, ms)); }
   </script>
 </body>
 </html>
