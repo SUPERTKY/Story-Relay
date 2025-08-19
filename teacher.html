@@ -120,6 +120,31 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
 
 /* ステータス */
 #status{min-height:1.2em;color:var(--muted);font-size:.95rem}
+    /* === 履歴パネル === */
+#history{
+  position: fixed; right: 16px; bottom: 16px;
+  width: 320px; max-height: 46vh;
+  background: rgba(6,10,24,.85); color: var(--fg);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 14px;
+  backdrop-filter: blur(6px); box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  display: flex; flex-direction: column; overflow: hidden; z-index: 20;
+}
+#historyHeader{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 8px 12px; font-weight: 700; background: rgba(255,255,255,.04);
+}
+#historyBody{ display:flex; flex-direction:column; gap:8px; padding:10px 12px; }
+#storyTotal{
+  font-size:.92rem; line-height:1.45; background: rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08); border-radius: 10px; padding:8px 10px; max-height: 90px; overflow:auto;
+}
+#historyList{ list-style:none; margin:0; padding:0; max-height: 160px; overflow:auto; }
+.histItem{ font-size:.9rem; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.08); }
+.histMeta{ color: var(--muted); font-size:.82rem; }
+#histToggle{ all:unset; cursor:pointer; padding:6px 8px; border-radius:8px; }
+#histToggle:hover{ background: rgba(255,255,255,.08); }
+.collapsed #historyBody{ display:none; }
+
   </style>
 </head>
 <body>
@@ -186,6 +211,12 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
     const db = firebase.database();
 
     // ===== DOM =====
+    // 履歴パネル
+const elHistory   = document.getElementById('history');
+const elHistToggle= document.getElementById('histToggle');
+const elHistoryList = document.getElementById('historyList');
+const elStoryTotal  = document.getElementById('storyTotal');
+
     const elStatus = document.getElementById('status');
     const elSetup  = document.getElementById('setup');
     const elStart  = document.getElementById('btnStart');
@@ -216,6 +247,9 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
     let currentTurn  = 1;
     let currentSeat  = '';
     let timerId      = null;
+    let totalStoryText = "";        // 連結した全文
+let historyRef = null;          // DBリスナー参照
+
 
     const today = new Date().toISOString().split('T')[0]; // 例: 2025-08-19
     let basePath = ''; // まとめくくり/<date>/<N>人まとめ
@@ -307,6 +341,33 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
           if(bgm.volume >= 1) clearInterval(fade);
         }, 60);
       }).catch(err=>console.warn('BGM再生に失敗:', err));
+      // 履歴リスナー（このセッションのルートに張る）
+if(historyRef){ historyRef.off(); }
+historyRef = firebase.database().ref(basePath);
+historyRef.on('child_added', snap => {
+  const key = snap.key;
+  if(key === '_meta') return; // メタは除外
+  const v = snap.val() || {};
+  const when = new Date(v.タイムスタンプ || Date.now());
+
+  // 連結テキスト更新
+  if (v.文字) {
+    totalStoryText = (totalStoryText + " " + v.文字).trim();
+    elStoryTotal.textContent = totalStoryText;
+  }
+
+  // 履歴アイテムを先頭に追加（新しい順）
+  const li = document.createElement('li');
+  li.className = 'histItem';
+  li.innerHTML = `
+    <div><strong>${escapeHtml(v.文字 || '')}</strong></div>
+    <div class="histMeta">
+      ${fmtDate(when)}／出席番号: ${escapeHtml(v.出席番号 || '-')}／${escapeHtml(key)}
+    </div>
+  `;
+  // 先頭に挿入
+  elHistoryList.insertBefore(li, elHistoryList.firstChild);
+});
 
       // 1人目の出席番号入力へ
       currentTurn = 1;
@@ -382,6 +443,12 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
           console.error(e);
           elStatus.textContent = '保存に失敗: ' + (e.code||e.message);
         });
+        // 即時ローカル反映（child_added を待たない）
+if (text) {
+  totalStoryText = (totalStoryText + " " + text).trim();
+  elStoryTotal.textContent = totalStoryText;
+}
+
       }
       hide(elInput);
       show(elSwitch);
@@ -400,6 +467,36 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
       show(elSeat);
       elSeatNo.focus();
     });
+    function fmtDate(d){
+  // 例: 2025-08-19 15:04:05
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[m]));
+}
+// パネル開閉
+elHistToggle.addEventListener('click', ()=>{
+  elHistory.classList.toggle('collapsed');
+  elHistToggle.textContent = elHistory.classList.contains('collapsed') ? '△' : '▽';
+});
+
   </script>
+  <!-- 履歴パネル -->
+<aside id="history" class="">
+  <div id="historyHeader">
+    <span>📜 履歴</span>
+    <button id="histToggle" aria-label="toggle">▽</button>
+  </div>
+  <div id="historyBody">
+    <div>
+      <div class="histMeta">これまでのストーリー（連結）</div>
+      <div id="storyTotal"></div>
+    </div>
+    <ul id="historyList"></ul>
+  </div>
+</aside>
+
 </body>
 </html>
+
