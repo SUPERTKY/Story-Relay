@@ -773,10 +773,20 @@ list.push({
   await db.ref(histPath).set({ messages:list, アーカイブ時刻: Date.now() }).catch(()=>{});
   await ref.remove().catch(()=>{});
 }
+// ★ ページ離脱時は必ず switch にして開始時刻を消す
+window.addEventListener('beforeunload', ()=>{
+  if (!basePath) return;
+  db.ref(`${basePath}/_meta`).update({
+    ターン状態: 'switch',
+    ターン開始時刻: null,
+    ターン終了時刻: Date.now()
+  }).catch(()=>{});
+});
 
   </script>
 </body>
 </html>
+
 
 
 
