@@ -39,10 +39,12 @@
       color: white;
       opacity: 0;
       transition: opacity 0.3s ease;
+      pointer-events: none; /* 👈 これで非表示時にクリックを邪魔しない */
     }
 
     #countdown.show {
       opacity: 1;
+      pointer-events: auto; /* 👈 表示中だけ有効にする */
     }
 
     @keyframes pop {
