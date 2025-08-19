@@ -413,6 +413,11 @@ let supportListenerOn = false;
       // ベースパス決定 & メタ保存（参加人数はまとめに一度だけ）
       basePath = `まとめくくり/${today}/${totalPlayers}人まとめ`;
       db.ref(`${basePath}/_meta`).update({ 参加人数: totalPlayers, 開始時刻: Date.now() }).catch(console.warn);
+    // elSeatOk.addEventListener('click', …) の中（入力画面に切り替える直前）に追加
+db.ref(`${basePath}/_meta`).update({
+  ターン開始時刻: firebase.database.ServerValue.TIMESTAMP,
+  ターン状態: 'running'
+}).catch(console.warn);
 
       // 右下履歴UIをリセット
       totalStoryText = '';
@@ -542,6 +547,13 @@ elSeatOk.addEventListener('click', ()=>{
           elStatus.textContent = '保存に失敗: ' + (e.code || e.message);
         }
       }
+      // handleDecide() の保存成功後すぐに追加
+await db.ref(`${basePath}/_meta`).update({
+  ターン状態: 'switch',
+  ターン終了時刻: firebase.database.ServerValue.TIMESTAMP,
+  ターン開始時刻: null // ← 明示的に消しておくと安全（nullでOK）
+}).catch(console.warn);
+
       hide(elInput);
       show(elSwitch);
     }
@@ -766,6 +778,7 @@ list.push({
   </script>
 </body>
 </html>
+
 
 
 
