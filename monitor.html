@@ -223,6 +223,7 @@ const elDate  = document.getElementById('dateLabel');
 
 const ring = document.getElementById('ring');
 const ringNum = document.getElementById('ringNum');
+const ringLabel = document.getElementById('ringLabel');
 
 const ticker = document.getElementById('ticker');
 const overlay = document.getElementById('overlay');
@@ -251,17 +252,15 @@ let basePath = '';        // まとめくくり/<date>/<N>人まとめ
 let meta = { 参加人数: 0, 状態: 'live', 開始時刻: 0 };
 let savedCount = 0;
 let timerId = null;
-let ringProgress = 0;
 let storyConcat = '';
-    // monitor.html
+
+// サーバー時刻同期
 let serverOffset = 0; // ms
 firebase.database().ref('/.info/serverTimeOffset').on('value', s=>{
   serverOffset = s.val() || 0;
 });
-    let turnStartAt = null; // ms (server 時刻)
+let turnStartAt = null; // ms (server基準)
 const nowServer = () => Date.now() + serverOffset;
-
-
 
 let rootOff = null, metaOff = null, sessOff = null;
 let audioReady = false;
@@ -269,7 +268,6 @@ let audioReady = false;
 /** ===== 音声有効化 ===== */
 audioEnable.addEventListener('click', async ()=>{
   try{
-    // 無音再生してオーディオ解放
     await Promise.allSettled([ bgm.play(), seWhoosh.play(), seTick.play(), seBeep.play() ]);
   }catch(_){} finally{
     [bgm, seWhoosh, seTick, seBeep].forEach(a=>{ try{ a.pause(); a.currentTime=0; }catch(_){} });
@@ -282,7 +280,7 @@ audioEnable.addEventListener('click', async ()=>{
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
   .catch(()=>{})
   .finally(async ()=>{
-    try{ if(!auth.currentUser) await auth.signInAnonymously(); }catch(_){}
+    try{ if(!auth.currentUser) await auth.signInAnonymously(); }catch(_){ }
     attachDateWatcher();
   });
 
@@ -315,31 +313,28 @@ function switchSession(nextPath, startTs){
 
   if(!basePath){ return; }
 
-  // メタ監視
-// 既存：metaRef.on('value', …) を下記に置換
-const metaRef = db.ref(`${basePath}/_meta`);
-const fn1 = metaRef.on('value', s=>{
-  meta = s.val() || { 参加人数:0, 状態:'live' };
-  elTotal.textContent = meta.参加人数 || 0;
+  // メタ監視（running のときのみ同期タイマー始動、交代中は停止）
+  const metaRef = db.ref(`${basePath}/_meta`);
+  const fn1 = metaRef.on('value', s=>{
+    meta = s.val() || { 参加人数:0, 状態:'live' };
+    elTotal.textContent = meta.参加人数 || 0;
 
-  // サーバー基準の開始時刻
-  turnStartAt = meta.ターン開始時刻 || null;
+    turnStartAt = meta.ターン開始時刻 || null;
 
-  // ★ running のときだけ（かつ開始時刻があるときだけ）同期タイマー始動
-  if (meta.ターン状態 === 'running' && turnStartAt){
-    stopTimer();
-    startTimer(); // 同期版（下記③）
-  } else {
-    // 交代中・未開始・終了などは止める
-    stopTimer();
-    // 見た目を止めたい場合は、ここで setRing(0) なども可
-  }
+    if (meta.ターン状態 === 'running' && turnStartAt){
+      stopTimer();
+      startTimer();
+      if(ringLabel) ringLabel.textContent = '制限時間';
+    } else {
+      stopTimer();
+      if(ringLabel) ringLabel.textContent = '交代中';
+      // 必要なら視覚的に止める
+      // setRing(0);
+    }
 
-  refreshStatus();
-});
-metaOff = ()=> metaRef.off('value', fn1);
-
-
+    refreshStatus();
+  });
+  metaOff = ()=> metaRef.off('value', fn1);
 
   // セッション全体監視（保存件数の把握・連結更新）
   const sessRef = db.ref(basePath);
@@ -353,12 +348,9 @@ metaOff = ()=> metaRef.off('value', fn1);
     storyConcat = keys.map(k=> (v[k] && v[k].文字) || '').filter(Boolean).join(' ');
     concatEl.textContent = storyConcat;
 
-    // 新規ターンが終わったら「交代演出」
+    // 新規ターンが終わったら交代演出だけ（タイマー再始動はしない）
     if(newSaved > savedCount){
       showSwitchOverlay(newSaved, total);
-      // 次ターンのタイマーを再始動
-      stopTimer(); startTimer();
-      // ちょっときらきら
       burstSparks(32);
     }
 
@@ -373,8 +365,8 @@ metaOff = ()=> metaRef.off('value', fn1);
   });
   sessOff = ()=> sessRef.off('value', fn2);
 
-  // セッション開始のカウントダウン（開始時刻が来たら）
-  if(startTs){ runStartCountdown(); fadeInBgm(); startTimer(); }
+  // セッション開始演出（タイマーは回さない）
+  if(startTs){ runStartCountdown(); fadeInBgm(); }
 }
 
 /** ===== 表示ステータス更新 ===== */
@@ -431,11 +423,7 @@ function showSwitchOverlay(done, total){
   setTimeout(hideOverlay, 1500);
 }
 
-/** ===== タイマー（30秒・リング＆チクタク） ===== */
-// すでに serverOffset は取得済み
-let turnStartAt = null;
-const nowServer = () => Date.now() + serverOffset;
-
+/** ===== タイマー（同期型・リング＆チクタク） ===== */
 function startTimer(){
   stopTimer();
   timerId = setInterval(()=>{
@@ -463,17 +451,6 @@ function setRing(t){
   ring.style.setProperty('--p', (100 - p).toFixed(2));
 }
 
-function setRing(t){
-  ringNum.textContent = t;
-  const p = Math.max(0, Math.min(100, t / LIMIT * 100));
-  ring.style.setProperty('--p', (100 - p).toFixed(2));
-}
-
-function stopTimer(){
-  if(timerId){ clearInterval(timerId); timerId=null; }
-}
-
-
 /** ===== BGM フェード ===== */
 function fadeInBgm(){
   if(!audioReady) return;
@@ -483,7 +460,7 @@ function fadeInBgm(){
       bgm.volume = Math.min(1, bgm.volume + 0.08);
       if(bgm.volume >= 1) clearInterval(id);
     }, 80);
-  }catch(_){}
+  }catch(_){ }
 }
 function fadeOutBgm(ms=2500){
   if(!audioReady) return Promise.resolve();
@@ -536,8 +513,8 @@ async function endSequence(){
   const speak = (text)=> new Promise(resolve=>{
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ja-JP';
-    u.rate = 1.18;          // ★ 少し速め
-    u.pitch = 1.0;          // ★ くっきり
+    u.rate = 1.18;          // 速め
+    u.pitch = 1.0;          // くっきり
     u.volume = 1.0;
     const pick = speechSynthesis.getVoices().find(v=> v.lang && v.lang.startsWith('ja'));
     if(pick) u.voice = pick;
@@ -556,7 +533,7 @@ async function endSequence(){
   lead.style.display = 'none';
   textEl.textContent = finalText;
 
-  // 5) 句読点ポーズ＋分割で読み上げ（聞き取りやすく）
+  // 5) 句読点ポーズ＋分割で読み上げ
   const normalized = finalText
     .replace(/、/g, '、 ')
     .replace(/。/g, '。 ')
@@ -581,7 +558,6 @@ async function endSequence(){
   }
 }
 
-
 /** ===== ユーティリティ ===== */
 function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function updateNoSession(){
@@ -596,5 +572,3 @@ function updateNoSession(){
   </script>
 </body>
 </html>
-
-
