@@ -486,6 +486,24 @@ elSupportPanel.classList.remove('hidden');
     }
 
     // ===== 出席番号 → 入力画面へ =====
+    // 出席番号OKの処理内（ターン開始直後）
+const metaRef = db.ref(`${basePath}/_meta`);
+
+// 公式な開始フラグ
+await metaRef.update({
+  ターン開始時刻: firebase.database.ServerValue.TIMESTAMP,
+  ターン状態: 'running'
+}).catch(console.warn);
+
+// ★ 保険：このクライアントが切断されたら自動で停止へ
+try{
+  metaRef.onDisconnect().update({
+    ターン状態: 'switch',
+    ターン開始時刻: null,
+    ターン終了時刻: firebase.database.ServerValue.TIMESTAMP
+  });
+}catch(_){}
+
 <!-- teacher.html の該当JS内：elSeatOk.addEventListener('click', ... ) の末尾付近に追加 -->
 elSeatOk.addEventListener('click', ()=>{
   const v = (elSeatNo.value||'').trim();
@@ -786,6 +804,7 @@ window.addEventListener('beforeunload', ()=>{
   </script>
 </body>
 </html>
+
 
 
 
