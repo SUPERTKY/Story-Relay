@@ -1,229 +1,315 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Teacher</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>先生ページ</title>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: #111;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      text-align: center;
+    :root{
+      --bg:#0f172a;
+      --fg:#e5e7eb;
+      --accent:#60a5fa;
+      --accent-2:#34d399;
+      --danger:#ef4444;
+      --muted:#94a3b8;
     }
+    html,body{height:100%;margin:0}
+    body{
+      background:var(--bg);
+      color:var(--fg);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;
+      display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+      text-align:center;overflow:hidden;padding:16px;
+    }
+    h1{margin:0 0 4px;font-size:1.4rem;color:var(--muted);font-weight:600}
 
-    #countdown {
-      font-size: 5em;
-      opacity: 0;
-      transition: opacity 0.5s;
-    }
+    .stack{display:flex;flex-direction:column;align-items:center;gap:12px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 
-    #inputArea, #turnArea {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
+    input,textarea,button{
+      font:inherit;border:none;border-radius:12px;outline:none;
     }
+    input,textarea{
+      background:#0b1220;color:var(--fg);padding:12px 14px;
+      border:1px solid rgba(255,255,255,.12);min-width:260px;
+    }
+    input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(96,165,250,.2)}
+    textarea{width:min(90vw,520px);height:92px;resize:none}
 
-    input, button {
-      font-size: 1.2em;
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: none;
-      margin: 5px;
+    .btn{
+      padding:12px 22px;font-weight:700;cursor:pointer;background:var(--accent);color:#0b1220;
+      box-shadow:0 8px 24px rgba(0,0,0,.35);transition:transform .08s ease,filter .2s ease,opacity .2s ease;
     }
+    .btn:hover{filter:brightness(1.05)}
+    .btn:active{transform:translateY(1px) scale(.99)}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .btn-ghost{background:transparent;color:var(--fg);border:1px solid rgba(255,255,255,.2)}
+    .btn-danger{background:var(--danger);color:#fff}
 
-    button {
-      background: #4caf50;
-      color: white;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
+    /* セクションの表示制御 */
+    .hidden{display:none}
 
-    button:hover {
-      background: #45a049;
+    /* カウントダウンの全画面演出 */
+    #overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.85);
+      display:none;align-items:center;justify-content:center;z-index:10;
     }
+    #overlay.show{display:flex}
+    #countNum{
+      font-size:min(14vw,140px);font-weight:900;letter-spacing:.02em;
+      text-shadow:0 0 24px rgba(255,255,255,.45);
+      animation:pop .9s ease forwards;
+    }
+    @keyframes pop{
+      0%{transform:scale(.2);opacity:0}
+      45%{transform:scale(1.25);opacity:1}
+      75%{transform:scale(.92)}
+      100%{transform:scale(1);opacity:1}
+    }
+    .startGlow{color:#facc15;text-shadow:0 0 24px #fbbf24,0 0 48px #f59e0b;animation:pop 1s ease forwards,blink 1s ease infinite alternate}
+    @keyframes blink{from{opacity:1}to{opacity:.65}}
 
-    #charCount {
-      font-size: 0.9em;
-      color: #ccc;
-    }
+    /* タイマー（30s） */
+    #timerWrap{width:min(92vw,520px);height:16px;background:#1f2937;border-radius:999px;overflow:hidden}
+    #timerBar{height:100%;width:100%;background:var(--accent-2);transition:width 1s linear}
 
-    #timer {
-      font-size: 1.5em;
-      margin-top: 10px;
-      color: #ffcc00;
-    }
+    /* ステータス */
+    #status{min-height:1.2em;color:var(--muted);font-size:.95rem}
   </style>
 </head>
 <body>
-  <h1>先生画面</h1>
+  <h1>ストーリーリレー（先生）</h1>
+  <div id="status">準備中…</div>
 
-  <!-- 参加人数・出席番号入力 -->
-  <div id="setupArea">
-    <input type="number" id="totalPlayers" placeholder="参加人数を入力">
-    <input type="number" id="myNumber" placeholder="自分の出席番号を入力">
-    <button id="startBtn">スタート</button>
+  <!-- セットアップ：参加人数のみ（出席番号は各ターンごと） -->
+  <section id="setup" class="stack">
+    <div class="row">
+      <input id="totalPlayers" type="number" min="1" inputmode="numeric" placeholder="参加人数を入力（例: 5）" />
+    </div>
+    <button id="btnStart" class="btn">スタート</button>
+  </section>
+
+  <!-- カウントダウン演出 -->
+  <div id="overlay">
+    <div id="countNum">3</div>
   </div>
 
-  <!-- カウントダウン -->
-  <div id="countdown"></div>
+  <!-- 各ターン：出席番号を先に -->
+  <section id="seat" class="stack hidden">
+    <div id="turnInfo">現在: 1人目 / - 人</div>
+    <div class="row">
+      <input id="seatNumber" type="number" inputmode="numeric" min="1" placeholder="出席番号を入力" />
+    </div>
+    <button id="btnSeatOk" class="btn">次へ</button>
+  </section>
 
-  <!-- 入力エリア -->
-  <div id="inputArea">
-    <textarea id="storyInput" maxlength="35" rows="3" cols="40" placeholder="ここに入力(最大35文字)"></textarea>
-    <div id="charCount">0 / 35</div>
-    <button id="submitBtn">決定</button>
-    <div id="timer">制限時間: 30</div>
-  </div>
+  <!-- 入力エリア（35文字・残数表示・30秒タイマー） -->
+  <section id="input" class="stack hidden">
+    <div id="remain">残り 35 文字</div>
+    <textarea id="story" maxlength="35" placeholder="ここに入力（最大35文字）"></textarea>
+    <div id="timerWrap"><div id="timerBar"></div></div>
+    <button id="btnDecide" class="btn">決定</button>
+  </section>
 
-  <!-- ターン切替エリア -->
-  <div id="turnArea">
-    <h2 id="turnMessage">次の人に代わってね！</h2>
-    <button id="nextTurnBtn">どうぞ！</button>
-  </div>
+  <!-- 交代エリア -->
+  <section id="switch" class="stack hidden">
+    <div style="font-size:1.1rem">次の人に代わってね！</div>
+    <button id="btnSwitched" class="btn-ghost">代わった</button>
+  </section>
 
-  <audio id="bgm" src="assets/game_bgm.mp3" loop></audio>
+  <!-- BGM（ループ） -->
+  <audio id="bgm" src="assets/game_bgm.mp3" loop preload="auto"></audio>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <!-- Firebase v8（バンドル・互換API） -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-    // === Firebase 設定 ===
-const firebaseConfig = {
-  apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
-  authDomain: "story-relay-ec15b.firebaseapp.com",
-  databaseURL: "https://story-relay-ec15b-default-rtdb.europe-west1.firebasedatabase.app/", // ← これに直す
-  projectId: "story-relay-ec15b",
-  storageBucket: "story-relay-ec15b.appspot.com",
-  messagingSenderId: "423778345800",
-  appId: "1:423778345800:web:d72d3569869bc3a789c97d"
-};
-
-
+    // ===== Firebase 設定（リージョンURLは europe-west1 を使用）=====
+    const firebaseConfig = {
+      apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
+      authDomain: "story-relay-ec15b.firebaseapp.com",
+      databaseURL: "https://story-relay-ec15b-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "story-relay-ec15b",
+      storageBucket: "story-relay-ec15b.appspot.com",
+      messagingSenderId: "423778345800",
+      appId: "1:423778345800:web:d72d3569869bc3a789c97d"
+    };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.database();
 
-    // === DOM要素 ===
-    const startBtn = document.getElementById("startBtn");
-    const totalPlayersInput = document.getElementById("totalPlayers");
-    const myNumberInput = document.getElementById("myNumber");
-    const countdownEl = document.getElementById("countdown");
-    const inputArea = document.getElementById("inputArea");
-    const storyInput = document.getElementById("storyInput");
-    const charCount = document.getElementById("charCount");
-    const submitBtn = document.getElementById("submitBtn");
-    const turnArea = document.getElementById("turnArea");
-    const nextTurnBtn = document.getElementById("nextTurnBtn");
-    const timerEl = document.getElementById("timer");
-    const bgm = document.getElementById("bgm");
+    // ===== DOM =====
+    const elStatus = document.getElementById('status');
+    const elSetup  = document.getElementById('setup');
+    const elStart  = document.getElementById('btnStart');
+    const elTotal  = document.getElementById('totalPlayers');
 
+    const elOverlay = document.getElementById('overlay');
+    const elCount   = document.getElementById('countNum');
+
+    const elSeat   = document.getElementById('seat');
+    const elTurn   = document.getElementById('turnInfo');
+    const elSeatNo = document.getElementById('seatNumber');
+    const elSeatOk = document.getElementById('btnSeatOk');
+
+    const elInput   = document.getElementById('input');
+    const elRemain  = document.getElementById('remain');
+    const elStory   = document.getElementById('story');
+    const elTimerBar= document.getElementById('timerBar');
+    const elDecide  = document.getElementById('btnDecide');
+
+    const elSwitch  = document.getElementById('switch');
+    const elSwitched= document.getElementById('btnSwitched');
+
+    const bgm = document.getElementById('bgm');
+
+    // ===== 状態 =====
+    const LIMIT = 30;  // 秒
     let totalPlayers = 0;
-    let currentPlayer = 1;
-    let currentStory = "";
-    let timer;
-    let timeLeft = 30;
+    let currentTurn  = 1;
+    let currentSeat  = '';
+    let timerId      = null;
 
-    // === スタートボタン ===
-    startBtn.addEventListener("click", async () => {
-      totalPlayers = parseInt(totalPlayersInput.value);
-      const myNumber = myNumberInput.value.trim();
+    const today = new Date().toISOString().split('T')[0]; // 例: 2025-08-19
+    let basePath = ''; // まとめくくり/<date>/<N>人まとめ
 
-      if (!totalPlayers || !myNumber) {
-        alert("参加人数と自分の番号を入力してください");
-        return;
-      }
-
-      document.getElementById("setupArea").style.display = "none";
-
-      await runCountdown();
-      try { bgm.play(); } catch(e) { console.warn("BGM再生失敗:", e); }
-
-      startTurn();
-    });
-
-    // === カウントダウン ===
-    async function runCountdown() {
-      const numbers = ["3", "2", "1", "スタート!"];
-      for (let num of numbers) {
-        countdownEl.innerText = num;
-        countdownEl.style.opacity = 1;
-        await new Promise(r => setTimeout(r, 1000));
-        countdownEl.style.opacity = 0;
-        await new Promise(r => setTimeout(r, 300));
-      }
-    }
-
-    // === ターン開始 ===
-    function startTurn() {
-      inputArea.style.display = "flex";
-      turnArea.style.display = "none";
-      storyInput.value = "";
-      updateCharCount();
-      resetTimer();
-    }
-
-    // === 文字数カウント ===
-    storyInput.addEventListener("input", updateCharCount);
-    function updateCharCount() {
-      charCount.textContent = storyInput.value.length + " / 35";
-    }
-
-    // === 決定ボタン ===
-    submitBtn.addEventListener("click", () => {
-      const text = storyInput.value.trim();
-      if (!text) return;
-
-      currentStory += text + " ";
-      saveToFirebase(currentStory);
-
-      inputArea.style.display = "none";
-      turnArea.style.display = "flex";
-    });
-
-    // === 次のターン ===
-    nextTurnBtn.addEventListener("click", () => {
-      currentPlayer++;
-      if (currentPlayer > totalPlayers) {
-        alert("全員終了しました！");
-        return;
-      }
-      startTurn();
-    });
-
-    // === タイマー ===
-    function resetTimer() {
-      clearInterval(timer);
-      timeLeft = 30;
-      timerEl.innerText = "制限時間: " + timeLeft;
-      timer = setInterval(() => {
-        timeLeft--;
-        timerEl.innerText = "制限時間: " + timeLeft;
-        if (timeLeft <= 0) {
-          clearInterval(timer);
-          submitBtn.click(); // 時間切れで自動決定
+    // ===== 匿名ログイン =====
+    async function ensureAnonSignIn(){
+      try{
+        if(!auth.currentUser){
+          await auth.signInAnonymously();
+          elStatus.textContent = '匿名ログイン完了';
+        }else{
+          elStatus.textContent = 'ログイン済み';
         }
-      }, 1000);
+      }catch(e){
+        console.error(e);
+        const map = {
+          'auth/operation-not-allowed':'匿名ログインが無効です（Auth→ログイン方法→匿名を有効化）',
+          'auth/unauthorized-domain':'このドメインが承認されていません（Auth→承認済みドメインに追加）'
+        };
+        elStatus.textContent = map[e.code] || ('ログイン失敗: ' + (e.code||e.message));
+      }
+    }
+    ensureAnonSignIn();
+
+    // ===== UI ユーティリティ =====
+    function show(sec){ sec.classList.remove('hidden'); }
+    function hide(sec){ sec.classList.add('hidden'); }
+    function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+    // ===== スタート押下：人数チェック→321→BGM→出席番号入力へ =====
+    elStart.addEventListener('click', async ()=>{
+      totalPlayers = parseInt(elTotal.value,10);
+      if(!totalPlayers || totalPlayers < 1){ alert('参加人数を入力してください'); return; }
+
+      // ベースパス決定 & メタ保存（参加人数はまとめに一度だけ）
+      basePath = `まとめくくり/${today}/${totalPlayers}人まとめ`;
+      firebase.database().ref(`${basePath}/_meta`).update({
+        参加人数: totalPlayers,
+        開始時刻: Date.now()
+      }).catch(console.warn);
+
+      hide(elSetup);
+      await runCountdown();
+
+      // ユーザー操作後なので BGM 再生が通りやすい
+      bgm.play().catch(err=>console.warn('BGM再生に失敗:', err));
+
+      // 1人目の出席番号入力へ
+      currentTurn = 1;
+      elTurn.textContent = `現在: ${currentTurn}人目 / 全 ${totalPlayers}人`;
+      elSeatNo.value = '';
+      show(elSeat);
+      elSeatNo.focus();
+    });
+
+    // ===== カウントダウン演出 =====
+    async function runCountdown(){
+      const seq = ['3','2','1','スタート!'];
+      show(elOverlay);
+      for(let i=0;i<seq.length;i++){
+        elCount.className = (i === seq.length-1) ? 'startGlow' : '';
+        elCount.textContent = seq[i];
+        // 再レイアウトでアニメを確実に
+        void elCount.offsetWidth;
+        await wait(900);
+      }
+      hide(elOverlay);
     }
 
-    // === Firebaseに保存 ===
-    function saveToFirebase(storyText) {
-      const today = new Date().toISOString().split("T")[0];
-      const refPath = `まとめくくり/${today}/${totalPlayers}人目くくり/${currentPlayer}`;
-      db.ref(refPath).set({
-        text: storyText,
-        player: currentPlayer,
-        timestamp: Date.now()
-      });
+    // ===== 出席番号 → 入力画面へ =====
+    elSeatOk.addEventListener('click', ()=>{
+      const v = (elSeatNo.value||'').trim();
+      if(!v){ alert('出席番号を入力してください'); elSeatNo.focus(); return; }
+      currentSeat = v;
+      // 入力開始へ
+      hide(elSeat);
+      elStory.value = '';
+      updateRemain();
+      show(elInput);
+      startTimer();
+      elStory.focus();
+    });
+
+    // ===== 入力文字数 残数表示 =====
+    function updateRemain(){
+      const left = 35 - (elStory.value||'').length;
+      elRemain.textContent = `残り ${left} 文字`;
     }
+    elStory.addEventListener('input', updateRemain);
+
+    // ===== 30秒タイマー =====
+    function startTimer(){
+      clearInterval(timerId);
+      let t = LIMIT;
+      elTimerBar.style.width = '100%';
+      timerId = setInterval(()=>{
+        t--;
+        elTimerBar.style.width = (t/LIMIT*100)+'%';
+        if(t<=0){
+          clearInterval(timerId);
+          handleDecide(); // 時間切れは自動決定
+        }
+      },1000);
+    }
+
+    // ===== 決定：保存 → 交代表示 =====
+    elDecide.addEventListener('click', handleDecide);
+    function handleDecide(){
+      clearInterval(timerId);
+      const text = (elStory.value||'').trim();
+      // 保存（空なら空のままでも保存可にしたければこの if を外す）
+      if(text){
+        const path = `${basePath}/${currentTurn}人目くくり`;
+        firebase.database().ref(path).set({
+          出席番号: currentSeat,
+          文字: text,
+          タイムスタンプ: Date.now()
+        }).catch(e=>{
+          console.error(e);
+          elStatus.textContent = '保存に失敗: ' + (e.code||e.message);
+        });
+      }
+      hide(elInput);
+      show(elSwitch);
+    }
+
+    // ===== 代わった → 次の人：また出席番号 → 入力 =====
+    elSwitched.addEventListener('click', ()=>{
+      hide(elSwitch);
+      currentTurn++;
+      if(currentTurn > totalPlayers){
+        elStatus.textContent = '全員終了しました。おつかれさま！';
+        return;
+      }
+      elTurn.textContent = `現在: ${currentTurn}人目 / 全 ${totalPlayers}人`;
+      elSeatNo.value = '';
+      show(elSeat);
+      elSeatNo.focus();
+    });
   </script>
 </body>
 </html>
-
