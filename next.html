@@ -173,11 +173,7 @@ function closeModal(){
   selectedRole = null;
 }
 
-    function closeModal(){
-      modalBackdrop.style.display = 'none';
-      modalBackdrop.setAttribute('aria-hidden', 'true');
-      studentBtn.disabled = false;
-    }
+
 teacherBtn.addEventListener('click', () => openModal('teacher'));
 monitorBtn.addEventListener('click', () => openModal('monitor')); // 追加
 cancelBtn.addEventListener('click', closeModal);
@@ -260,6 +256,7 @@ onAuthStateChanged(auth, (user) => {
   </script>
 </body>
 </html>
+
 
 
 
