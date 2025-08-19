@@ -473,8 +473,15 @@ if (text) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[m]));
+  return String(s).replace(/[&<>"']/g, m => ({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'    // ←ここを修正
+  }[m]));
 }
+
 // パネル開閉
 elHistToggle.addEventListener('click', ()=>{
   elHistory.classList.toggle('collapsed');
@@ -500,5 +507,6 @@ elHistToggle.addEventListener('click', ()=>{
 
 </body>
 </html>
+
 
 
