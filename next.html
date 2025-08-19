@@ -204,11 +204,7 @@ pwInput.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
 });
 
-    okBtn.addEventListener('click', teacherLogin);
-    pwInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') teacherLogin();
-      if (e.key === 'Escape') closeModal();
-    });
+
 
     // 4) 生徒は匿名ログイン（「ログインが必要」を満たしつつ権限は最低限）
     async function studentEnter(){
@@ -256,6 +252,7 @@ onAuthStateChanged(auth, (user) => {
   </script>
 </body>
 </html>
+
 
 
 
