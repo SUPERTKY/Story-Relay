@@ -316,19 +316,29 @@ function switchSession(nextPath, startTs){
   if(!basePath){ return; }
 
   // メタ監視
+// 既存：metaRef.on('value', …) を下記に置換
 const metaRef = db.ref(`${basePath}/_meta`);
 const fn1 = metaRef.on('value', s=>{
-  meta = s.val() || { 参加人数:0, 状態:'live', 開始時刻: 0 };
+  meta = s.val() || { 参加人数:0, 状態:'live' };
   elTotal.textContent = meta.参加人数 || 0;
 
-  // ★ このターンの公式開始時刻（先生が書いたサーバー時刻）
+  // サーバー基準の開始時刻
   turnStartAt = meta.ターン開始時刻 || null;
 
+  // ★ running のときだけ（かつ開始時刻があるときだけ）同期タイマー始動
+  if (meta.ターン状態 === 'running' && turnStartAt){
+    stopTimer();
+    startTimer(); // 同期版（下記③）
+  } else {
+    // 交代中・未開始・終了などは止める
+    stopTimer();
+    // 見た目を止めたい場合は、ここで setRing(0) なども可
+  }
+
   refreshStatus();
-  // 開始時刻が入ったらタイマーを“同期で”走らせる
-  if (turnStartAt) { stopTimer(); startTimer(); }
 });
 metaOff = ()=> metaRef.off('value', fn1);
+
 
 
   // セッション全体監視（保存件数の把握・連結更新）
@@ -422,6 +432,10 @@ function showSwitchOverlay(done, total){
 }
 
 /** ===== タイマー（30秒・リング＆チクタク） ===== */
+// すでに serverOffset は取得済み
+let turnStartAt = null;
+const nowServer = () => Date.now() + serverOffset;
+
 function startTimer(){
   stopTimer();
   timerId = setInterval(()=>{
@@ -442,6 +456,13 @@ function startTimer(){
     if(left<=0){ stopTimer(); }
   }, 1000);
 }
+function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
+function setRing(t){
+  ringNum.textContent = t;
+  const p = Math.max(0, Math.min(100, t / LIMIT * 100));
+  ring.style.setProperty('--p', (100 - p).toFixed(2));
+}
+
 function setRing(t){
   ringNum.textContent = t;
   const p = Math.max(0, Math.min(100, t / LIMIT * 100));
@@ -575,4 +596,5 @@ function updateNoSession(){
   </script>
 </body>
 </html>
+
 
