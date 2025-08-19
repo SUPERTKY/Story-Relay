@@ -16,7 +16,6 @@
     }
 
     .btn {
-      appearance: none;
       border: none;
       cursor: pointer;
       padding: 16px 32px;
@@ -32,7 +31,7 @@
     .btn:hover { background: #3b82f6; }
     .btn:active { transform: translateY(2px) scale(.98); }
 
-    /* カウントダウン演出用 */
+    /* カウントダウン演出 */
     #countdown {
       position: fixed;
       inset: 0;
@@ -50,22 +49,19 @@
 
     .show {
       opacity: 1;
-      pointer-events: auto;
     }
 
     @keyframes pop {
       0% { transform: scale(0.2); opacity: 0; }
-      40% { transform: scale(1.2); opacity: 1; }
-      70% { transform: scale(0.9); }
+      50% { transform: scale(1.2); opacity: 1; }
       100% { transform: scale(1); opacity: 1; }
     }
     .pop {
       animation: pop 0.8s ease forwards;
     }
 
-    /* スタートの特別演出 */
     .start {
-      color: #facc15; /* 黄色 */
+      color: #facc15;
       text-shadow: 0 0 20px #fbbf24, 0 0 40px #f59e0b;
       font-size: 7rem;
       animation: pop 1s ease forwards, blink 1s ease infinite alternate;
@@ -79,27 +75,28 @@
 </head>
 <body>
   <button class="btn" id="startBtn">スタート</button>
-
   <div id="countdown"></div>
 
-  <script type="module">
+  <script>
     const startBtn = document.getElementById('startBtn');
     const countdown = document.getElementById('countdown');
 
     startBtn.addEventListener('click', async () => {
-      startBtn.style.display = 'none'; // ボタン非表示
+      startBtn.style.display = 'none'; 
       await runCountdown();
       alert("ゲーム開始！ここで次の処理に進めます。");
-      // ここにFirebase通知やページ遷移を追加可能
     });
 
     async function runCountdown() {
       countdown.classList.add('show');
       const numbers = ["3", "2", "1", "スタート!"];
       for (let i = 0; i < numbers.length; i++) {
+        // 文字を更新
         countdown.innerHTML = `<div class="${i === numbers.length-1 ? 'start' : 'pop'}">${numbers[i]}</div>`;
+        // 1秒待つ
         await wait(1000);
       }
+      // 最後はフェードアウト
       countdown.classList.remove('show');
     }
 
