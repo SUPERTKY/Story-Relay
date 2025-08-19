@@ -625,10 +625,16 @@ function resetUI() {
   endedOnce = false;
   lastMetaState = null;
 }
+    window.addEventListener('beforeunload', () => {
+  stopTimer();
+  fadeOutBgm();
+});
+
 
   </script>
 </body>
 </html>
+
 
 
 
