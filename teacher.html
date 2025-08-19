@@ -257,6 +257,7 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
 </aside>
 
 
+
   <!-- Firebase v8（バンドル・互換API） -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -324,7 +325,7 @@ const elSupportPanel = document.getElementById('supportPanel');
 const elSupportBody  = document.getElementById('supportBody');
 const elMsgCount     = document.getElementById('msgCount');
 const elBtnClearView = document.getElementById('btnClearView');
-
+  
 
     // ===== 状態 =====
     const LIMIT = 30;  // 秒
@@ -334,6 +335,9 @@ const elBtnClearView = document.getElementById('btnClearView');
     let timerId      = null;
     let totalStoryText = "";        // 連結した全文（右下）
     let historyRef = null;           // DBリスナー参照
+  // サポート購読に使う状態
+let supportRef = null;
+let supportListenerOn = false;
 
     const today = new Date().toISOString().split('T')[0]; // 例: 2025-08-19
     let basePath = ''; // まとめくくり/<date>/<N>人まとめ
@@ -543,13 +547,16 @@ elSwitched.addEventListener('click', async ()=>{
 
   hide(elSwitch);
   currentTurn++;
-  if(currentTurn > totalPlayers){
-    elStatus.textContent = '全員終了しました。おつかれさま！';
-    // 念のため残りがあればアーカイブして購読解除
-    await archiveSupportForTurn('終了時残り');
-    detachSupportListener();
-    return;
-  }
+if(currentTurn > totalPlayers){
+  // セッション終了フラグ（生徒端末はこれを見て未開催へ）
+  db.ref(`${basePath}/_meta`).update({ 状態:'ended', 終了時刻: Date.now() }).catch(()=>{});
+  elStatus.textContent = '全員終了しました。おつかれさま！';
+  // 念のためサポート残りをアーカイブ & 監視解除
+  await archiveSupportForTurn('終了時残り');
+  detachSupportListener();
+  return;
+}
+
   elTurn.textContent = `現在: ${currentTurn}人目 / 全 ${totalPlayers}人`;
   elSeatNo.value = '';
   show(elSeat);
@@ -689,8 +696,8 @@ elSwitched.addEventListener('click', async ()=>{
       t.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);background:#111827;color:#fff;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);z-index:60;';
       document.body.appendChild(t); setTimeout(()=> t.remove(), 1600);
     }
-    function appendSupportItem(v){
-  const seat = v.座席 || '-';
+function appendSupportItem(v){
+  const seat = v.出席番号 || v.座席 || '-';
   const txt  = v.文 || '';
   const when = fmtDate(new Date(v.タイムスタンプ || Date.now()));
   const item = document.createElement('div');
@@ -702,6 +709,7 @@ elSwitched.addEventListener('click', async ()=>{
   while(elSupportBody.children.length>20){ elSupportBody.lastChild.remove(); }
   elMsgCount.textContent = elSupportBody.children.length;
 }
+
 
 function clearSupportView(){
   elSupportBody.innerHTML='';
@@ -735,11 +743,12 @@ async function archiveSupportForTurn(turnLabel){
   const list=[];
   snap.forEach(c=>{
     const v=c.val()||{};
-    list.push({
-      座席: v.座席 || '-',
-      文: v.文 || '',
-      タイムスタンプ: v.タイムスタンプ || Date.now()
-    });
+list.push({
+  出席番号: v.出席番号 || v.座席 || '-',
+  文: v.文 || '',
+  タイムスタンプ: v.タイムスタンプ || Date.now()
+});
+
   });
   if(list.length===0) return; // 何もなければ何もしない
   const histPath = `${basePath}/_supportHistory/${turnLabel}人目くくり`;
@@ -750,5 +759,6 @@ async function archiveSupportForTurn(turnLabel){
   </script>
 </body>
 </html>
+
 
 
