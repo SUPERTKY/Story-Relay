@@ -414,10 +414,7 @@ let supportListenerOn = false;
       basePath = `まとめくくり/${today}/${totalPlayers}人まとめ`;
       db.ref(`${basePath}/_meta`).update({ 参加人数: totalPlayers, 開始時刻: Date.now() }).catch(console.warn);
     // elSeatOk.addEventListener('click', …) の中（入力画面に切り替える直前）に追加
-db.ref(`${basePath}/_meta`).update({
-  ターン開始時刻: firebase.database.ServerValue.TIMESTAMP,
-  ターン状態: 'running'
-}).catch(console.warn);
+
 
       // 右下履歴UIをリセット
       totalStoryText = '';
@@ -495,19 +492,21 @@ elSeatOk.addEventListener('click', ()=>{
   if(!v){ alert('出席番号を入力してください'); elSeatNo.focus(); return; }
   currentSeat = v;
 
-  // ★★★ ここを追加：このターンの公式な開始時刻（サーバー時刻）
+  // ★ 次のターン本番スタート（サーバー時刻＆状態＝running）
   db.ref(`${basePath}/_meta`).update({
-    ターン開始時刻: firebase.database.ServerValue.TIMESTAMP
+    ターン開始時刻: firebase.database.ServerValue.TIMESTAMP,
+    ターン状態: 'running'
   }).catch(console.warn);
 
-  // 入力開始へ
+  // 入力画面へ
   hide(elSeat);
   elStory.value = '';
   updateRemain();
   show(elInput);
-  startTimer();
+  startTimer(); // 先生側の視覚タイマー（モニターの同期とは独立）
   elStory.focus();
 });
+
 
     // ===== 入力文字数 残数表示 =====
     function updateRemain(){
@@ -778,6 +777,7 @@ list.push({
   </script>
 </body>
 </html>
+
 
 
 
