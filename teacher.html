@@ -29,7 +29,7 @@ body{
   0%{background-position:0 0,0 0,0 0; filter:hue-rotate(0deg)}
   100%{background-position:10px -14px,-12px 18px,0 0; filter:hue-rotate(10deg)}
 }
-h1{margin:0 0 4px;font-size:1.4rem;color:var(--muted);font-weight:600}
+ h1{margin:0 0 4px;font-size:1.4rem;color:var(--muted);font-weight:600}
 
 .stack{display:flex;flex-direction:column;align-items:center;gap:12px}
 .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -77,10 +77,8 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
 #countNum{
   position:relative;
   font-size:min(16vw,160px);font-weight:1000;letter-spacing:.02em;line-height:1;
-  color:#eaf2ff;-webkit-text-stroke:6px rgba(255,255,255,.12); /* 厚み */
-  text-shadow:
-    0 0 22px rgba(96,165,250,.5),
-    0 0 48px rgba(59,130,246,.35);
+  color:#eaf2ff;-webkit-text-stroke:6px rgba(255,255,255,.12);
+  text-shadow: 0 0 22px rgba(96,165,250,.5), 0 0 48px rgba(59,130,246,.35);
   filter:drop-shadow(0 10px 30px rgba(0,0,0,.6));
   animation:pop .9s ease forwards, wobble .9s ease forwards;
 }
@@ -122,7 +120,6 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
 
 /* ステータス */
 #status{min-height:1.2em;color:var(--muted);font-size:.95rem}
-
   </style>
 </head>
 <body>
@@ -223,7 +220,11 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
     const today = new Date().toISOString().split('T')[0]; // 例: 2025-08-19
     let basePath = ''; // まとめくくり/<date>/<N>人まとめ
 
-    // ===== 匿名ログイン =====
+    // ===== 匿名ログイン（セッション永続化でトラッキング防止の影響を緩和） =====
+    auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+      .catch(e => console.warn('setPersistence failed:', e))
+      .finally(ensureAnonSignIn);
+
     async function ensureAnonSignIn(){
       try{
         if(!auth.currentUser){
@@ -241,12 +242,47 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
         elStatus.textContent = map[e.code] || ('ログイン失敗: ' + (e.code||e.message));
       }
     }
-    ensureAnonSignIn();
 
-    // ===== UI ユーティリティ =====
-    function show(sec){ sec.classList.remove('hidden'); }
-    function hide(sec){ sec.classList.add('hidden'); }
+    // ===== UI ユーティリティ（アニメ付き表示/非表示） =====
+    function show(el){
+      if(el.id === 'overlay'){
+        el.classList.add('show');
+      }else{
+        el.classList.remove('hidden');
+        el.classList.remove('section-exit');
+        void el.offsetWidth; // reflow
+        el.classList.add('section-enter');
+      }
+    }
+    function hide(el){
+      if(el.id === 'overlay'){
+        el.classList.remove('show');
+      }else{
+        el.classList.remove('section-enter');
+        el.classList.add('section-exit');
+        setTimeout(()=> el.classList.add('hidden'), 320);
+      }
+    }
+    // 待機
     function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+    // コンフェッティ風スパーク
+    function burstSparks(n){
+      let layer = document.querySelector('.sparks');
+      if(!layer){ layer = document.createElement('div'); layer.className='sparks'; elOverlay.appendChild(layer); }
+      const palette = ['#60a5fa','#93c5fd','#facc15','#fb923c','#34d399'];
+      for(let i=0;i<n;i++){
+        const s = document.createElement('div');
+        s.className='spark'; s.style.color = palette[i%palette.length];
+        const angle = Math.random()*Math.PI*2;
+        const dist  = 160 + Math.random()*160;
+        s.style.setProperty('--dx', Math.cos(angle)*dist+'px');
+        s.style.setProperty('--dy', Math.sin(angle)*dist+'px');
+        s.style.left='50%'; s.style.top='50%'; s.style.transform='translate(-50%,-50%)';
+        layer.appendChild(s);
+        setTimeout(()=> s.remove(), 950);
+      }
+    }
 
     // ===== スタート押下：人数チェック→321→BGM→出席番号入力へ =====
     elStart.addEventListener('click', async ()=>{
@@ -264,7 +300,13 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
       await runCountdown();
 
       // ユーザー操作後なので BGM 再生が通りやすい
-      bgm.play().catch(err=>console.warn('BGM再生に失敗:', err));
+      bgm.volume = 0; // フェードイン
+      bgm.play().then(()=>{
+        const fade = setInterval(()=>{
+          bgm.volume = Math.min(1, bgm.volume + 0.1);
+          if(bgm.volume >= 1) clearInterval(fade);
+        }, 60);
+      }).catch(err=>console.warn('BGM再生に失敗:', err));
 
       // 1人目の出席番号入力へ
       currentTurn = 1;
@@ -281,8 +323,8 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
       for(let i=0;i<seq.length;i++){
         elCount.className = (i === seq.length-1) ? 'startGlow' : '';
         elCount.textContent = seq[i];
-        // 再レイアウトでアニメを確実に
-        void elCount.offsetWidth;
+        if(i === seq.length-1) burstSparks(28); else burstSparks(10);
+        void elCount.offsetWidth; // reflow してアニメ確実化
         await wait(900);
       }
       hide(elOverlay);
@@ -329,7 +371,7 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
     function handleDecide(){
       clearInterval(timerId);
       const text = (elStory.value||'').trim();
-      // 保存（空なら空のままでも保存可にしたければこの if を外す）
+      // 空文字は保存しない（必要ならこの if を外す）
       if(text){
         const path = `${basePath}/${currentTurn}人目くくり`;
         firebase.database().ref(path).set({
@@ -361,4 +403,3 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
   </script>
 </body>
 </html>
-
