@@ -493,7 +493,7 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
       const text = (elStory.value || '').trim();
       // 空文字でも交代だけ進めたい場合は if を外す
       if (text) {
-        const path = `${basePath}/${currentTurn}人目くくり`;
+        const path = `${basePath}/${currentTurn}`;
         try {
           await db.ref(path).set({ 出席番号: currentSeat, 文字: text, タイムスタンプ: Date.now() });
         } catch (e) {
@@ -654,3 +654,4 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
   </script>
 </body>
 </html>
+
