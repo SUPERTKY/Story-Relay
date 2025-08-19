@@ -487,13 +487,6 @@ elSupportPanel.classList.remove('hidden');
 
     // ===== 出席番号 → 入力画面へ =====
     // 出席番号OKの処理内（ターン開始直後）
-const metaRef = db.ref(`${basePath}/_meta`);
-
-// 公式な開始フラグ
-await metaRef.update({
-  ターン開始時刻: firebase.database.ServerValue.TIMESTAMP,
-  ターン状態: 'running'
-}).catch(console.warn);
 
 // ★ 保険：このクライアントが切断されたら自動で停止へ
 try{
@@ -804,6 +797,7 @@ window.addEventListener('beforeunload', ()=>{
   </script>
 </body>
 </html>
+
 
 
 
