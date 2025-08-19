@@ -8,7 +8,7 @@
     html, body {
       height: 100%; margin: 0;
       font-family: system-ui, sans-serif;
-      background: #111827; /* 落ち着いた背景色 */
+      background: #111827;
       color: #fff;
       display: flex;
       justify-content: center;
@@ -27,22 +27,85 @@
       color: #0b1220;
       box-shadow: 0 6px 18px rgba(0,0,0,.3);
       transition: transform 0.1s ease, background 0.2s ease;
+      z-index: 1;
     }
     .btn:hover { background: #3b82f6; }
     .btn:active { transform: translateY(2px) scale(.98); }
+
+    /* カウントダウン演出用 */
+    #countdown {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 6rem;
+      font-weight: 900;
+      background: rgba(0,0,0,0.85);
+      z-index: 999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0.2); opacity: 0; }
+      40% { transform: scale(1.2); opacity: 1; }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .pop {
+      animation: pop 0.8s ease forwards;
+    }
+
+    /* スタートの特別演出 */
+    .start {
+      color: #facc15; /* 黄色 */
+      text-shadow: 0 0 20px #fbbf24, 0 0 40px #f59e0b;
+      font-size: 7rem;
+      animation: pop 1s ease forwards, blink 1s ease infinite alternate;
+    }
+
+    @keyframes blink {
+      from { opacity: 1; }
+      to   { opacity: 0.6; }
+    }
   </style>
 </head>
 <body>
-  <!-- 中央にスタートボタン -->
   <button class="btn" id="startBtn">スタート</button>
 
+  <div id="countdown"></div>
+
   <script type="module">
-    // 後で Firebase や他の処理を組み込む想定
     const startBtn = document.getElementById('startBtn');
-    startBtn.addEventListener('click', () => {
-      alert('スタートボタンが押されました！');
-      // ここに Firebase 更新やページ遷移処理などを追加していく
+    const countdown = document.getElementById('countdown');
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.style.display = 'none'; // ボタン非表示
+      await runCountdown();
+      alert("ゲーム開始！ここで次の処理に進めます。");
+      // ここにFirebase通知やページ遷移を追加可能
     });
+
+    async function runCountdown() {
+      countdown.classList.add('show');
+      const numbers = ["3", "2", "1", "スタート!"];
+      for (let i = 0; i < numbers.length; i++) {
+        countdown.innerHTML = `<div class="${i === numbers.length-1 ? 'start' : 'pop'}">${numbers[i]}</div>`;
+        await wait(1000);
+      }
+      countdown.classList.remove('show');
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
   </script>
 </body>
 </html>
