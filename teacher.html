@@ -29,7 +29,7 @@ body{
   0%{background-position:0 0,0 0,0 0; filter:hue-rotate(0deg)}
   100%{background-position:10px -14px,-12px 18px,0 0; filter:hue-rotate(10deg)}
 }
- h1{margin:0 0 4px;font-size:1.4rem;color:var(--muted);font-weight:600}
+h1{margin:0 0 4px;font-size:1.4rem;color:var(--muted);font-weight:600}
 
 .stack{display:flex;flex-direction:column;align-items:center;gap:12px}
 .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -120,7 +120,8 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
 
 /* ステータス */
 #status{min-height:1.2em;color:var(--muted);font-size:.95rem}
-    /* === 履歴パネル === */
+
+/* === 右下・履歴パネル === */
 #history{
   position: fixed; right: 16px; bottom: 16px;
   width: 320px; max-height: 46vh;
@@ -129,22 +130,27 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
   backdrop-filter: blur(6px); box-shadow: 0 10px 30px rgba(0,0,0,.4);
   display: flex; flex-direction: column; overflow: hidden; z-index: 20;
 }
-#historyHeader{
-  display:flex; align-items:center; justify-content:space-between;
-  padding: 8px 12px; font-weight: 700; background: rgba(255,255,255,.04);
-}
+#historyHeader{display:flex; align-items:center; justify-content:space-between; padding: 8px 12px; font-weight: 700; background: rgba(255,255,255,.04)}
 #historyBody{ display:flex; flex-direction:column; gap:8px; padding:10px 12px; }
-#storyTotal{
-  font-size:.92rem; line-height:1.45; background: rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.08); border-radius: 10px; padding:8px 10px; max-height: 90px; overflow:auto;
-}
-#historyList{ list-style:none; margin:0; padding:0; max-height: 160px; overflow:auto; }
-.histItem{ font-size:.9rem; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.08); }
-.histMeta{ color: var(--muted); font-size:.82rem; }
-#histToggle{ all:unset; cursor:pointer; padding:6px 8px; border-radius:8px; }
-#histToggle:hover{ background: rgba(255,255,255,.08); }
-.collapsed #historyBody{ display:none; }
+#storyTotal{font-size:.92rem; line-height:1.45; background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); border-radius: 10px; padding:8px 10px; max-height: 90px; overflow:auto}
+#historyList{ list-style:none; margin:0; padding:0; max-height: 160px; overflow:auto }
+.histItem{ font-size:.9rem; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.08) }
+.histMeta{ color: var(--muted); font-size:.82rem }
+#histToggle{ all:unset; cursor:pointer; padding:6px 8px; border-radius:8px }
+#histToggle:hover{ background: rgba(255,255,255,.08) }
+.collapsed #historyBody{ display:none }
 
+/* === 履歴モーダル === */
+#historyModal{position:fixed; inset:0; display:none; z-index:50; background:rgba(0,0,0,.6); align-items:center; justify-content:center}
+#historyModal.show{display:flex}
+#historyCard{width:min(92vw,900px); max-height:80vh; overflow:auto; background:#0b1022; color:#e5e7eb; border:1px solid rgba(255,255,255,.12); border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.6); padding:16px 18px}
+#historyToolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px}
+#historyDate{background:#0f172a; color:#e5e7eb; border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px}
+#sessionSelect{background:#0f172a; color:#e5e7eb; border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px}
+#modalList{list-style:none; padding:0; margin:10px 0; display:flex; flex-direction:column; gap:10px}
+.modalItem{padding:10px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.04)}
+.modalMeta{color:#94a3b8; font-size:.9rem; margin-top:4px}
+#modalStoryConcat{white-space:pre-wrap; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:10px; max-height:160px; overflow:auto}
   </style>
 </head>
 <body>
@@ -156,7 +162,10 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
     <div class="row">
       <input id="totalPlayers" type="number" min="1" inputmode="numeric" placeholder="参加人数を入力（例: 5）" />
     </div>
-    <button id="btnStart" class="btn">スタート</button>
+    <div class="row">
+      <button id="btnStart" class="btn">スタート</button>
+      <button id="btnOpenHistory" class="btn-ghost">履歴を見る</button>
+    </div>
   </section>
 
   <!-- カウントダウン演出 -->
@@ -187,21 +196,46 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
     <button id="btnSwitched" class="btn-ghost">代わった</button>
   </section>
 
+  <!-- 右下：履歴パネル -->
+  <aside id="history" class="">
+    <div id="historyHeader">
+      <span>📜 履歴</span>
+      <button id="histToggle" aria-label="toggle">▽</button>
+    </div>
+    <div id="historyBody">
+      <div>
+        <div class="histMeta">これまでのストーリー（連結）</div>
+        <div id="storyTotal"></div>
+      </div>
+      <ul id="historyList"></ul>
+    </div>
+  </aside>
+
+  <!-- 全画面履歴モーダル -->
+  <div id="historyModal" aria-hidden="true">
+    <div id="historyCard">
+      <div id="historyToolbar">
+        <strong style="margin-right:6px">履歴</strong>
+        <input id="historyDate" type="date">
+        <select id="sessionSelect" title="セッション（参加人数まとめ）"></select>
+        <button id="btnReload" class="btn-ghost">読み込み</button>
+        <span style="flex:1"></span>
+        <button id="btnCopyAll" class="btn">全文コピー</button>
+        <button id="btnExportCsv" class="btn">CSV</button>
+        <button id="btnCloseHistory" class="btn-danger">閉じる</button>
+      </div>
+
+      <div class="histMeta">この日の連結ストーリー</div>
+      <div id="modalStoryConcat"></div>
+
+      <div style="margin-top:10px" class="histMeta">回答一覧（時系列）</div>
+      <ul id="modalList"></ul>
+    </div>
+  </div>
+
   <!-- BGM（ループ） -->
   <audio id="bgm" src="assets/game_bgm.mp3" loop preload="auto"></audio>
-<aside id="history" class="">
-  <div id="historyHeader">
-    <span>📜 履歴</span>
-    <button id="histToggle" aria-label="toggle">▽</button>
-  </div>
-  <div id="historyBody">
-    <div>
-      <div class="histMeta">これまでのストーリー（連結）</div>
-      <div id="storyTotal"></div>
-    </div>
-    <ul id="historyList"></ul>
-  </div>
-</aside>
+
   <!-- Firebase v8（バンドル・互換API） -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -223,12 +257,6 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
     const db = firebase.database();
 
     // ===== DOM =====
-    // 履歴パネル
-const elHistory   = document.getElementById('history');
-const elHistToggle= document.getElementById('histToggle');
-const elHistoryList = document.getElementById('historyList');
-const elStoryTotal  = document.getElementById('storyTotal');
-
     const elStatus = document.getElementById('status');
     const elSetup  = document.getElementById('setup');
     const elStart  = document.getElementById('btnStart');
@@ -251,6 +279,24 @@ const elStoryTotal  = document.getElementById('storyTotal');
     const elSwitch  = document.getElementById('switch');
     const elSwitched= document.getElementById('btnSwitched');
 
+    // 右下履歴
+    const elHistory   = document.getElementById('history');
+    const elHistToggle= document.getElementById('histToggle');
+    const elHistoryList = document.getElementById('historyList');
+    const elStoryTotal  = document.getElementById('storyTotal');
+
+    // 履歴モーダル
+    const btnOpenHistory   = document.getElementById('btnOpenHistory');
+    const historyModal     = document.getElementById('historyModal');
+    const btnCloseHistory  = document.getElementById('btnCloseHistory');
+    const historyDateInput = document.getElementById('historyDate');
+    const sessionSelect    = document.getElementById('sessionSelect');
+    const btnReload        = document.getElementById('btnReload');
+    const modalStoryConcat = document.getElementById('modalStoryConcat');
+    const modalList        = document.getElementById('modalList');
+    const btnCopyAll       = document.getElementById('btnCopyAll');
+    const btnExportCsv     = document.getElementById('btnExportCsv');
+
     const bgm = document.getElementById('bgm');
 
     // ===== 状態 =====
@@ -259,9 +305,8 @@ const elStoryTotal  = document.getElementById('storyTotal');
     let currentTurn  = 1;
     let currentSeat  = '';
     let timerId      = null;
-    let totalStoryText = "";        // 連結した全文
-let historyRef = null;          // DBリスナー参照
-
+    let totalStoryText = "";        // 連結した全文（右下）
+    let historyRef = null;           // DBリスナー参照
 
     const today = new Date().toISOString().split('T')[0]; // 例: 2025-08-19
     let basePath = ''; // まとめくくり/<date>/<N>人まとめ
@@ -309,7 +354,6 @@ let historyRef = null;          // DBリスナー参照
         setTimeout(()=> el.classList.add('hidden'), 320);
       }
     }
-    // 待機
     function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
     // コンフェッティ風スパーク
@@ -337,10 +381,12 @@ let historyRef = null;          // DBリスナー参照
 
       // ベースパス決定 & メタ保存（参加人数はまとめに一度だけ）
       basePath = `まとめくくり/${today}/${totalPlayers}人まとめ`;
-      firebase.database().ref(`${basePath}/_meta`).update({
-        参加人数: totalPlayers,
-        開始時刻: Date.now()
-      }).catch(console.warn);
+      db.ref(`${basePath}/_meta`).update({ 参加人数: totalPlayers, 開始時刻: Date.now() }).catch(console.warn);
+
+      // 右下履歴UIをリセット
+      totalStoryText = '';
+      elStoryTotal.textContent = '';
+      elHistoryList.innerHTML = '';
 
       hide(elSetup);
       await runCountdown();
@@ -353,33 +399,33 @@ let historyRef = null;          // DBリスナー参照
           if(bgm.volume >= 1) clearInterval(fade);
         }, 60);
       }).catch(err=>console.warn('BGM再生に失敗:', err));
+
       // 履歴リスナー（このセッションのルートに張る）
-if(historyRef){ historyRef.off(); }
-historyRef = firebase.database().ref(basePath);
-historyRef.on('child_added', snap => {
-  const key = snap.key;
-  if(key === '_meta') return; // メタは除外
-  const v = snap.val() || {};
-  const when = new Date(v.タイムスタンプ || Date.now());
+      if(historyRef){ historyRef.off(); }
+      historyRef = db.ref(basePath);
+      historyRef.on('child_added', snap => {
+        const key = snap.key;
+        if(key === '_meta') return; // メタは除外
+        const v = snap.val() || {};
+        const when = new Date(v.タイムスタンプ || Date.now());
 
-  // 連結テキスト更新
-  if (v.文字) {
-    totalStoryText = (totalStoryText + " " + v.文字).trim();
-    elStoryTotal.textContent = totalStoryText;
-  }
+        // 連結テキスト更新（右下）
+        if (v.文字) {
+          totalStoryText = (totalStoryText + " " + v.文字).trim();
+          if (elStoryTotal) elStoryTotal.textContent = totalStoryText;
+        }
 
-  // 履歴アイテムを先頭に追加（新しい順）
-  const li = document.createElement('li');
-  li.className = 'histItem';
-  li.innerHTML = `
-    <div><strong>${escapeHtml(v.文字 || '')}</strong></div>
-    <div class="histMeta">
-      ${fmtDate(when)}／出席番号: ${escapeHtml(v.出席番号 || '-')}／${escapeHtml(key)}
-    </div>
-  `;
-  // 先頭に挿入
-  elHistoryList.insertBefore(li, elHistoryList.firstChild);
-});
+        // 履歴アイテム（右下）
+        if (elHistoryList) {
+          const li = document.createElement('li');
+          li.className = 'histItem';
+          li.innerHTML = `
+            <div><strong>${escapeHtml(v.文字 || '')}</strong></div>
+            <div class="histMeta">${fmtDate(when)}／出席番号: ${escapeHtml(v.出席番号 || '-')}／${escapeHtml(key)}</div>
+          `;
+          elHistoryList.insertBefore(li, elHistoryList.firstChild);
+        }
+      });
 
       // 1人目の出席番号入力へ
       currentTurn = 1;
@@ -439,23 +485,25 @@ historyRef.on('child_added', snap => {
       },1000);
     }
 
-    // ===== 決定：保存 → 交代表示 =====
+    // ===== 決定：保存 → 交代表示（反映は child_added に任せる） =====
     elDecide.addEventListener('click', handleDecide);
-async function handleDecide() {
-  const text = elInputText.value.trim();
-  if (!text) return;
+    async function handleDecide() {
+      clearInterval(timerId);
 
-  const ref = db.ref("rooms/" + roomNum + "/log").push();
-  await ref.set({
-    名前: seatNo,
-    文字: text,
-    時刻: Date.now()
-  });
-
-  elInputText.value = "";
-  // ここで totalStoryText += text; はしない！
-}
-
+      const text = (elStory.value || '').trim();
+      // 空文字でも交代だけ進めたい場合は if を外す
+      if (text) {
+        const path = `${basePath}/${currentTurn}人目くくり`;
+        try {
+          await db.ref(path).set({ 出席番号: currentSeat, 文字: text, タイムスタンプ: Date.now() });
+        } catch (e) {
+          console.error(e);
+          elStatus.textContent = '保存に失敗: ' + (e.code || e.message);
+        }
+      }
+      hide(elInput);
+      show(elSwitch);
+    }
 
     // ===== 代わった → 次の人：また出席番号 → 入力 =====
     elSwitched.addEventListener('click', ()=>{
@@ -470,37 +518,139 @@ async function handleDecide() {
       show(elSeat);
       elSeatNo.focus();
     });
+
+    // ===== 右下パネルの開閉 =====
+    elHistToggle.addEventListener('click', ()=>{
+      elHistory.classList.toggle('collapsed');
+      elHistToggle.textContent = elHistory.classList.contains('collapsed') ? '△' : '▽';
+    });
+
+    // ===== 履歴モーダル：日付初期値（今日） =====
+    (function initHistoryDate(){
+      const tz = new Date();
+      const yyyy = tz.getFullYear();
+      const mm = String(tz.getMonth()+1).padStart(2,'0');
+      const dd = String(tz.getDate()).padStart(2,'0');
+      historyDateInput.value = `${yyyy}-${mm}-${dd}`;
+    })();
+
+    // ===== 履歴モーダル：開閉 =====
+    btnOpenHistory.addEventListener('click', async ()=>{
+      historyModal.classList.add('show');
+      await populateSessions();
+      await loadHistory();
+    });
+    btnCloseHistory.addEventListener('click', ()=> historyModal.classList.remove('show'));
+    btnReload.addEventListener('click', loadHistory);
+
+    // 指定日の「◯人まとめ」を取得してセレクトに反映
+    async function populateSessions(){
+      sessionSelect.innerHTML = '';
+      const dateKey = historyDateInput.value; // 2025-08-19 など
+      const rootRef = db.ref(`まとめくくり/${dateKey}`);
+      const snap = await rootRef.once('value');
+      const obj = snap.val() || {};
+      const keys = Object.keys(obj).filter(k => k.endsWith('人まとめ'));
+
+      if(keys.length === 0){
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '（セッションなし）';
+        sessionSelect.appendChild(opt);
+        return;
+      }
+      keys.sort((a,b)=> a.localeCompare(b,'ja'));
+      for(const k of keys){
+        const o = document.createElement('option');
+        o.value = k;
+        o.textContent = k; // 例: 5人まとめ
+        sessionSelect.appendChild(o);
+      }
+    }
+
+    // セッション履歴を読み込み（モーダル用）
+    async function loadHistory(){
+      modalList.innerHTML = '';
+      modalStoryConcat.textContent = '';
+
+      const dateKey = historyDateInput.value;
+      const sessionKey = sessionSelect.value;
+      if(!dateKey || !sessionKey){ return; }
+
+      const ref = db.ref(`まとめくくり/${dateKey}/${sessionKey}`);
+      const snap = await ref.once('value');
+      const obj = snap.val() || {};
+      const entries = Object.entries(obj)
+        .filter(([k])=>k !== '_meta')
+        .map(([k,v])=>({key:k, ...v}))
+        // タイムスタンプ昇順（早い→遅い）
+        .sort((a,b)=>(a.タイムスタンプ||0)-(b.タイムスタンプ||0));
+
+      // 連結テキスト
+      const concat = entries.map(e=> e.文字 || '').filter(Boolean).join(' ');
+      modalStoryConcat.textContent = concat;
+
+      // 一覧
+      for(const e of entries){
+        const when = new Date(e.タイムスタンプ || Date.now());
+        const li = document.createElement('li');
+        li.className = 'modalItem';
+        li.innerHTML = `
+          <div><strong>${escapeHtml(e.文字||'')}</strong></div>
+          <div class="modalMeta">${fmtDate(when)}／出席番号: ${escapeHtml(e.出席番号||'-')}／${escapeHtml(e.key)}</div>
+        `;
+        modalList.appendChild(li);
+      }
+    }
+
+    // 全文コピー
+    btnCopyAll.addEventListener('click', async ()=>{
+      const text = modalStoryConcat.textContent || '';
+      try{
+        await navigator.clipboard.writeText(text);
+        toast('コピーしました');
+      }catch{ prompt('コピーできない場合はここから手動でコピーしてください', text); }
+    });
+
+    // CSV エクスポート
+    btnExportCsv.addEventListener('click', ()=>{
+      const rows = [['日時','出席番号','テキスト','キー']];
+      const items = modalList.querySelectorAll('.modalItem');
+      items.forEach(it=>{
+        const meta = it.querySelector('.modalMeta').textContent;
+        const text = it.querySelector('strong').textContent;
+        // 例: 2025-08-19 12:34:56／出席番号: 3／5人目くくり
+        const m = meta.match(/^(.*?)／出席番号: (.*?)／(.*)$/);
+        const date = m?m[1]:''; const seat = m?m[2]:''; const key = m?m[3]:'';
+        rows.push([date, seat, text, key]);
+      });
+      const csv = rows.map(r=> r.map(csvCell).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `story_relay_${historyDateInput.value}_${sessionSelect.value||'session'}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // ===== ヘルパ =====
     function fmtDate(d){
-  // 例: 2025-08-19 15:04:05
-  const pad = n => String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, m => ({
-    '&':'&amp;',
-    '<':'&lt;',
-    '>':'&gt;',
-    '"':'&quot;',
-    "'":'&#39;'    // ←ここを修正
-  }[m]));
-}
-
-// パネル開閉
-elHistToggle.addEventListener('click', ()=>{
-  elHistory.classList.toggle('collapsed');
-  elHistToggle.textContent = elHistory.classList.contains('collapsed') ? '△' : '▽';
-});
-                                            
-
+      const pad = n => String(n).padStart(2,'0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+    }
+    function csvCell(s){
+      const text = String(s||'');
+      // ダブルクオートで囲み、内部の" を "" に
+      return '"' + text.replace(/"/g,'""') + '"';
+    }
+    function toast(msg){
+      const t = document.createElement('div');
+      t.textContent = msg;
+      t.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);background:#111827;color:#fff;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);z-index:60;';
+      document.body.appendChild(t); setTimeout(()=> t.remove(), 1600);
+    }
   </script>
-
-
-
 </body>
 </html>
-
-
-
-
-
-
