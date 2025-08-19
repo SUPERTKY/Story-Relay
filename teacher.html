@@ -189,7 +189,19 @@ textarea{width:min(90vw,520px);height:92px;resize:none}
 
   <!-- BGM（ループ） -->
   <audio id="bgm" src="assets/game_bgm.mp3" loop preload="auto"></audio>
-
+<aside id="history" class="">
+  <div id="historyHeader">
+    <span>📜 履歴</span>
+    <button id="histToggle" aria-label="toggle">▽</button>
+  </div>
+  <div id="historyBody">
+    <div>
+      <div class="histMeta">これまでのストーリー（連結）</div>
+      <div id="storyTotal"></div>
+    </div>
+    <ul id="historyList"></ul>
+  </div>
+</aside>
   <!-- Firebase v8（バンドル・互換API） -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -490,23 +502,12 @@ elHistToggle.addEventListener('click', ()=>{
                                             
 
   </script>
- <aside id="history" class="">
-  <div id="historyHeader">
-    <span>📜 履歴</span>
-    <button id="histToggle" aria-label="toggle">▽</button>
-  </div>
-  <div id="historyBody">
-    <div>
-      <div class="histMeta">これまでのストーリー（連結）</div>
-      <div id="storyTotal"></div>
-    </div>
-    <ul id="historyList"></ul>
-  </div>
-</aside>
+
 
 
 </body>
 </html>
+
 
 
 
