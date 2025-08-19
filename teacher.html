@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teacher Page</title>
+  <style>
+    html, body {
+      height: 100%; margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #111827; /* 落ち着いた背景色 */
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .btn {
+      appearance: none;
+      border: none;
+      cursor: pointer;
+      padding: 16px 32px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      border-radius: 999px;
+      background: #60a5fa;
+      color: #0b1220;
+      box-shadow: 0 6px 18px rgba(0,0,0,.3);
+      transition: transform 0.1s ease, background 0.2s ease;
+    }
+    .btn:hover { background: #3b82f6; }
+    .btn:active { transform: translateY(2px) scale(.98); }
+  </style>
+</head>
+<body>
+  <!-- 中央にスタートボタン -->
+  <button class="btn" id="startBtn">スタート</button>
+
+  <script type="module">
+    // 後で Firebase や他の処理を組み込む想定
+    const startBtn = document.getElementById('startBtn');
+    startBtn.addEventListener('click', () => {
+      alert('スタートボタンが押されました！');
+      // ここに Firebase 更新やページ遷移処理などを追加していく
+    });
+  </script>
+</body>
+</html>
