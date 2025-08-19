@@ -441,30 +441,21 @@ historyRef.on('child_added', snap => {
 
     // ===== 決定：保存 → 交代表示 =====
     elDecide.addEventListener('click', handleDecide);
-    function handleDecide(){
-      clearInterval(timerId);
-      const text = (elStory.value||'').trim();
-      // 空文字は保存しない（必要ならこの if を外す）
-      if(text){
-        const path = `${basePath}/${currentTurn}人目くくり`;
-        firebase.database().ref(path).set({
-          出席番号: currentSeat,
-          文字: text,
-          タイムスタンプ: Date.now()
-        }).catch(e=>{
-          console.error(e);
-          elStatus.textContent = '保存に失敗: ' + (e.code||e.message);
-        });
-        // 即時ローカル反映（child_added を待たない）
-if (text) {
-  totalStoryText = (totalStoryText + " " + text).trim();
-  elStoryTotal.textContent = totalStoryText;
+async function handleDecide() {
+  const text = elInputText.value.trim();
+  if (!text) return;
+
+  const ref = db.ref("rooms/" + roomNum + "/log").push();
+  await ref.set({
+    名前: seatNo,
+    文字: text,
+    時刻: Date.now()
+  });
+
+  elInputText.value = "";
+  // ここで totalStoryText += text; はしない！
 }
 
-      }
-      hide(elInput);
-      show(elSwitch);
-    }
 
     // ===== 代わった → 次の人：また出席番号 → 入力 =====
     elSwitched.addEventListener('click', ()=>{
@@ -507,6 +498,7 @@ elHistToggle.addEventListener('click', ()=>{
 
 </body>
 </html>
+
 
 
 
