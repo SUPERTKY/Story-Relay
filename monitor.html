@@ -253,6 +253,15 @@ let savedCount = 0;
 let timerId = null;
 let ringProgress = 0;
 let storyConcat = '';
+    // monitor.html
+let serverOffset = 0; // ms
+firebase.database().ref('/.info/serverTimeOffset').on('value', s=>{
+  serverOffset = s.val() || 0;
+});
+    let turnStartAt = null; // ms (server 時刻)
+const nowServer = () => Date.now() + serverOffset;
+
+
 
 let rootOff = null, metaOff = null, sessOff = null;
 let audioReady = false;
@@ -307,13 +316,20 @@ function switchSession(nextPath, startTs){
   if(!basePath){ return; }
 
   // メタ監視
-  const metaRef = db.ref(`${basePath}/_meta`);
-  const fn1 = metaRef.on('value', s=>{
-    meta = s.val() || { 参加人数:0, 状態:'live', 開始時刻: 0 };
-    elTotal.textContent = meta.参加人数 || 0;
-    refreshStatus();
-  });
-  metaOff = ()=> metaRef.off('value', fn1);
+const metaRef = db.ref(`${basePath}/_meta`);
+const fn1 = metaRef.on('value', s=>{
+  meta = s.val() || { 参加人数:0, 状態:'live', 開始時刻: 0 };
+  elTotal.textContent = meta.参加人数 || 0;
+
+  // ★ このターンの公式開始時刻（先生が書いたサーバー時刻）
+  turnStartAt = meta.ターン開始時刻 || null;
+
+  refreshStatus();
+  // 開始時刻が入ったらタイマーを“同期で”走らせる
+  if (turnStartAt) { stopTimer(); startTimer(); }
+});
+metaOff = ()=> metaRef.off('value', fn1);
+
 
   // セッション全体監視（保存件数の把握・連結更新）
   const sessRef = db.ref(basePath);
@@ -408,29 +424,34 @@ function showSwitchOverlay(done, total){
 /** ===== タイマー（30秒・リング＆チクタク） ===== */
 function startTimer(){
   stopTimer();
-  let t = LIMIT;
-  setRing(t);
   timerId = setInterval(()=>{
-    t--;
-    setRing(t);
+    let left = LIMIT;
+    if (turnStartAt){
+      left = Math.ceil(LIMIT - (nowServer() - turnStartAt)/1000);
+    }
+    left = Math.max(0, Math.min(LIMIT, left));
+    setRing(left);
+
     if(audioReady){
-      if(t > 0 && t <= 5){
+      if(left > 0 && left <= 5){
         try{ seBeep.currentTime=0; seBeep.play(); }catch(_){}
-      }else{
+      }else if(left > 0){
         try{ seTick.currentTime=0; seTick.play(); }catch(_){}
       }
     }
-    if(t<=0){ stopTimer(); }
+    if(left<=0){ stopTimer(); }
   }, 1000);
 }
+function setRing(t){
+  ringNum.textContent = t;
+  const p = Math.max(0, Math.min(100, t / LIMIT * 100));
+  ring.style.setProperty('--p', (100 - p).toFixed(2));
+}
+
 function stopTimer(){
   if(timerId){ clearInterval(timerId); timerId=null; }
 }
-function setRing(t){
-  ringNum.textContent = Math.max(0, t);
-  const p = Math.max(0, Math.min(100, t / LIMIT * 100));
-  ring.style.setProperty('--p', (100 - p).toFixed(2)); // 減っていく表示
-}
+
 
 /** ===== BGM フェード ===== */
 function fadeInBgm(){
@@ -478,39 +499,67 @@ async function endSequence(){
   stopTimer();
   await fadeOutBgm(2500);
 
-  // ブラックアウト
+  // 1) 真っ黒へフェードイン
   theEnd.classList.add('show');
+  await wait(700);
 
-  // テキスト掲示（合成音声で読み上げ）
+  const lead = document.getElementById('finLead');
+  const textEl = document.getElementById('finText');
   const finalText = storyConcat || '(本文なし)';
-  finText.textContent = finalText;
 
-  // Web Speech API 読み上げ
-  try{
-    const speak = (text)=> new Promise(done=>{
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'ja-JP';
-      u.rate = 0.95; u.pitch = 1.05; u.volume = 1.0;
-      const pick = window.speechSynthesis.getVoices().find(v=> v.lang.startsWith('ja'));
-      if(pick) u.voice = pick;
-      u.onend = ()=> done();
-      // 一部ブラウザは voices のロードが遅延する
-      if(speechSynthesis.getVoices().length===0){
-        speechSynthesis.onvoiceschanged = ()=> speechSynthesis.speak(u);
-      }else{
-        speechSynthesis.speak(u);
-      }
-    });
+  // 2) 見出しだけ表示
+  textEl.textContent = '';      // 本文はまだ出さない
+  lead.style.display = 'block';
 
-    // 「完成した作品は…」→ 本文
-    await wait(500);
-    await speak('完成した作品は……');
-    await speak(finalText);
+  // 明瞭＆速めの読み上げ（分割読み）
+  const speak = (text)=> new Promise(resolve=>{
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ja-JP';
+    u.rate = 1.18;          // ★ 少し速め
+    u.pitch = 1.0;          // ★ くっきり
+    u.volume = 1.0;
+    const pick = speechSynthesis.getVoices().find(v=> v.lang && v.lang.startsWith('ja'));
+    if(pick) u.voice = pick;
+    u.onend = ()=> resolve();
+    if(speechSynthesis.getVoices().length===0){
+      speechSynthesis.onvoiceschanged = ()=> speechSynthesis.speak(u);
+    }else{
+      speechSynthesis.speak(u);
+    }
+  });
 
-  }catch(_){
-    // 読み上げ不可なら何もしない（文字のみ表示）
+  // 3) 「完成した作品は……」を読み上げ
+  try{ await speak('完成した作品は……'); }catch(_){}
+
+  // 4) 見出しを消す → 本文を表示
+  lead.style.display = 'none';
+  textEl.textContent = finalText;
+
+  // 5) 句読点ポーズ＋分割で読み上げ（聞き取りやすく）
+  const normalized = finalText
+    .replace(/、/g, '、 ')
+    .replace(/。/g, '。 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const chunks = [];
+  const maxLen = 80;
+  let rest = normalized;
+  while(rest.length){
+    if(rest.length <= maxLen){ chunks.push(rest); break; }
+    const tmp = rest.slice(0, maxLen);
+    const idx = Math.max(tmp.lastIndexOf('。'), tmp.lastIndexOf('、'), tmp.lastIndexOf('！'), tmp.lastIndexOf('？'), tmp.lastIndexOf(' '));
+    const cut = (idx > 20 ? idx+1 : maxLen);
+    chunks.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
+  }
+
+  for(const c of chunks){
+    try{ await speak(c); }catch(_){}
+    await wait(80);
   }
 }
+
 
 /** ===== ユーティリティ ===== */
 function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
@@ -526,3 +575,4 @@ function updateNoSession(){
   </script>
 </body>
 </html>
+
