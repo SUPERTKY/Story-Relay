@@ -5,56 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Story Relay タイトル</title>
   <style>
-    :root {
-      --bg-url: url('assets/taitoru.png'); /* 背景画像ファイル名に合わせて変更 */
-    }
+    :root { --bg-url: url('assets/taitoru.png'); }
 
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
 
-    body {
+    body{
       background: var(--bg-url) center/cover no-repeat fixed;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      overflow: hidden;
-      cursor: pointer; /* タップ可能であることを示す */
-      opacity: 0;
-      transition: opacity 2s ease-in; /* フェードイン */
+      display:flex; justify-content:center; align-items:center; flex-direction:column;
+      overflow:hidden;
+      cursor:pointer;
+      opacity:0;                       /* 初期は非表示 */
+      transition:opacity 2s ease-in;   /* フェードイン */
+      will-change:opacity;
     }
+    body.fade-in{ opacity:1; }
 
-    body.fade-in {
-      opacity: 1;
+    .sound-gate{
+      position:fixed; inset:0; display:none;
+      background:rgba(0,0,0,.55); backdrop-filter:blur(3px);
+      align-items:center; justify-content:center; z-index:2;
     }
-
-    .sound-gate {
-      position: fixed; inset: 0;
-      display: none;
-      background: rgba(0,0,0,.55);
-      backdrop-filter: blur(3px);
-      align-items: center; justify-content: center;
-      z-index: 2;
+    .gate-card{
+      background:rgba(20,20,20,.7);
+      padding:24px 28px; border-radius:16px;
+      max-width:480px; width:min(90%,480px);
+      box-shadow:0 10px 30px rgba(0,0,0,.5);
+      color:#fff; text-align:center; font-family:sans-serif;
     }
-    .gate-card {
-      background: rgba(20,20,20,.7);
-      padding: 24px 28px; border-radius: 16px;
-      max-width: 480px; width: min(90%, 480px);
-      box-shadow: 0 10px 30px rgba(0,0,0,.5);
-      color: #fff;
-      text-align: center;
-      font-family: sans-serif;
+    .gate-title{ font-size:1.25rem; margin:0 0 8px; }
+    .gate-desc{ font-size:.95rem; opacity:.9; margin:0 0 16px; }
+    .gate-btn{
+      display:inline-block; width:100%;
+      padding:12px 16px; border-radius:999px; border:none; cursor:pointer; font-weight:700;
+      background:#ffd166; color:#222; box-shadow:0 6px 16px rgba(0,0,0,.3);
     }
-    .gate-title { font-size: 1.25rem; margin: 0 0 8px; }
-    .gate-desc { font-size: .95rem; opacity: .9; margin: 0 0 16px; }
-    .gate-btn {
-      display: inline-block; width: 100%;
-      padding: 12px 16px; border-radius: 999px;
-      border: none; cursor: pointer; font-weight: 700;
-      background: #ffd166; color: #222;
-      box-shadow: 0 6px 16px rgba(0,0,0,.3);
-    }
-    .gate-btn:active { transform: translateY(1px); }
+    .gate-btn:active{ transform:translateY(1px); }
   </style>
 </head>
 <body>
@@ -69,28 +55,26 @@
   </div>
 
   <script>
-    (function() {
+    (function(){
       const audio = document.getElementById('bgm');
-      const gate = document.getElementById('soundGate');
-      const btn  = document.getElementById('enableSound');
-      const body = document.body;
+      const gate  = document.getElementById('soundGate');
+      const btn   = document.getElementById('enableSound');
+      const body  = document.body;
 
-      // フェードイン開始
-      window.addEventListener('load', () => {
-        requestAnimationFrame(() => {
-          body.classList.add('fade-in');
-        });
-      });
+      // 画像の読み込み完了を待たずにフェードイン開始
+      document.addEventListener('DOMContentLoaded', () => {
+        requestAnimationFrame(() => body.classList.add('fade-in'));
+      }, { once:true });
 
+      // BGM自動再生（失敗でゲート表示）
       const tryPlay = () => audio.play().catch(() => {
         gate.style.display = 'flex';
         gate.setAttribute('aria-hidden', 'false');
       });
-
       if (document.readyState === 'complete' || document.readyState === 'interactive') {
         tryPlay();
       } else {
-        document.addEventListener('DOMContentLoaded', tryPlay, { once: true });
+        document.addEventListener('DOMContentLoaded', tryPlay, { once:true });
       }
 
       btn.addEventListener('click', async () => {
@@ -98,32 +82,38 @@
           await audio.play();
           gate.style.display = 'none';
           gate.setAttribute('aria-hidden', 'true');
-        } catch (e) {
+        } catch {
           try {
-            audio.muted = true;
-            await audio.play();
+            audio.muted = true; await audio.play();
             setTimeout(() => { audio.muted = false; }, 100);
             gate.style.display = 'none';
             gate.setAttribute('aria-hidden', 'true');
-          } catch (err) {
-            console.warn('Audio play failed:', err);
-          }
+          } catch(err) { console.warn('Audio play failed:', err); }
         }
       });
 
-      // フェードイン完了を待ってから遷移可能にする
-      let fadeDone = false;
-      body.addEventListener('transitionend', () => {
-        fadeDone = true;
+      // フェードイン完了までは遷移不可
+      let canNavigate = false;
+      const enableNav = () => { canNavigate = true; };
+
+      // Safari対策でタイムアウトも用意（CSS 2s に +100ms）
+      const FADE_MS = 2000;
+      setTimeout(enableNav, FADE_MS + 100);
+
+      body.addEventListener('transitionend', (e) => {
+        if (e.propertyName === 'opacity') enableNav();
       });
 
-      body.addEventListener('click', () => {
-        if (fadeDone) {
-          window.location.href = 'next.html'; // 次のHTMLのファイル名に変更してください
+      body.addEventListener('click', (ev) => {
+        const gateOpen = gate.getAttribute('aria-hidden') === 'false';
+        if (!canNavigate || gateOpen) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          return; // フェード中 or ゲート表示中は移動させない
         }
+        window.location.href = 'next.html'; // 遷移先
       });
     })();
   </script>
 </body>
 </html>
-
