@@ -97,15 +97,16 @@
 
   <script>
     // === Firebase 設定 ===
-    const firebaseConfig = {
-      apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
-      authDomain: "story-relay-ec15b.firebaseapp.com",
-      databaseURL: "https://story-relay-ec15b-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "story-relay-ec15b",
-      storageBucket: "story-relay-ec15b.appspot.com",
-      messagingSenderId: "423778345800",
-      appId: "1:423778345800:web:d72d3569869bc3a789c97d"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
+  authDomain: "story-relay-ec15b.firebaseapp.com",
+  databaseURL: "https://story-relay-ec15b-default-rtdb.europe-west1.firebasedatabase.app/", // ← これに直す
+  projectId: "story-relay-ec15b",
+  storageBucket: "story-relay-ec15b.appspot.com",
+  messagingSenderId: "423778345800",
+  appId: "1:423778345800:web:d72d3569869bc3a789c97d"
+};
+
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -225,3 +226,4 @@
   </script>
 </body>
 </html>
+
