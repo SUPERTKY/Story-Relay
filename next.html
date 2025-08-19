@@ -71,6 +71,7 @@
       <button class="btn" id="teacherBtn">先生</button>
       <button class="btn" id="studentBtn">生徒</button>
     </div>
+    <div id="status" style="margin-top:12px; min-height:1.2em; opacity:.9;"></div>
   </div>
 
   <!-- 入場フェード用 黒ベール -->
@@ -81,11 +82,10 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mdTitle">
       <h2 id="mdTitle">先生ログイン</h2>
       <p>先生用パスワードを入力してください。</p>
-<div class="field">
-  <label for="pw">パスワード</label>
-  <input class="input" id="pw" type="text" autocomplete="off" />
-</div>
-
+      <div class="field">
+        <label for="pw">パスワード</label>
+        <input class="input" id="pw" type="password" inputmode="text" autocomplete="current-password" />
+      </div>
       <div class="msg" id="msg"></div>
       <div class="modal-actions">
         <button class="btn btn-danger" id="cancelBtn">キャンセル</button>
@@ -100,8 +100,7 @@
     import { getAuth, signInWithEmailAndPassword, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     // ★ Firebase 設定を書き換えてください
-
-    const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyBEi8rqSSmEJCcJAf4AcW3QmTIwAjNLb-o",
   authDomain: "story-relay-ec15b.firebaseapp.com",
   projectId: "story-relay-ec15b",
@@ -109,7 +108,6 @@
   messagingSenderId: "423778345800",
   appId: "1:423778345800:web:d72d3569869bc3a789c97d"
 };
-
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
@@ -125,6 +123,7 @@
     const okBtn       = document.getElementById('okBtn');
     const pwInput     = document.getElementById('pw');
     const msg         = document.getElementById('msg');
+    const statusEl    = document.getElementById('status');
 
     // 1) 入場時フェードアウト
     const startEnterFade = () => {
@@ -178,6 +177,7 @@
 
     // 4) 生徒は匿名ログイン（「ログインが必要」を満たしつつ権限は最低限）
     async function studentEnter(){
+      statusEl.textContent = '生徒としてログイン中...';
       studentBtn.disabled = true;
       try {
         // 既にログイン済みならそのまま
@@ -186,7 +186,14 @@
         window.location.href = 'student.html';
       } catch (e) {
         console.error(e);
-        alert('ログインに失敗しました。通信状況を確認してください。');
+        // 代表的なエラーの原因と対処
+        const map = {
+          'auth/operation-not-allowed': '匿名ログインが無効です。Firebaseコンソール→Authentication→ログイン方法 で「匿名」を有効にしてください。',
+          'auth/network-request-failed': 'ネットワークエラーです。通信環境を確認してください。',
+          'auth/invalid-api-key': 'APIキーが不正です。firebaseConfig を確認してください。',
+          'auth/unauthorized-domain': 'このドメインは認可されていません。Auth の承認済みドメイン設定に現在のドメインを追加してください。'
+        };
+        statusEl.textContent = map[e.code] || `ログインに失敗しました: ${e.code || e.message}`;
       } finally {
         studentBtn.disabled = false;
       }
@@ -195,16 +202,18 @@
 
     // （任意）すでに先生でログイン済みなら自動で teacher.html へ
     onAuthStateChanged(auth, (user) => {
-      if (!user) return;
-      // 先生アカウントは匿名ではない（emailVerified でなくてもOK）
-      if (user.isAnonymous) return; // 生徒はスルー
-      // 先生として残っていたら teacher.html へ
-      // ※必要ならここでクレーム検査 or メール一致検査
+      if (!user) { statusEl.textContent = ''; return; }
+      if (user.isAnonymous) {
+        statusEl.textContent = '（匿名ユーザーでサインイン中）';
+        return;
+      }
       if (user.email === TEACHER_EMAIL) {
+        statusEl.textContent = '先生としてサインイン中。まもなく先生ページへ移動します。';
         window.location.href = 'teacher.html';
+      } else {
+        statusEl.textContent = `別アカウントでサインイン中（${user.email||'emailなし'}）`;
       }
     });
   </script>
 </body>
 </html>
-
